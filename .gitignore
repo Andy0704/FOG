@@ -1,0 +1,52 @@
+# ---- Secrets (NEVER commit) ----
+.env
+.env.*
+*.pem
+*.key
+*.token
+secrets.*
+credentials*
+# (GitHub PATs, API keys, etc. — keep these out of the repo and out of git history)
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# ---- Virtual environments (do NOT commit; reproduce via requirements.txt) ----
+fog_env_64/
+fog_env/
+.venv/
+venv/
+env/
+
+# ---- Data: large + licensing. Document the download in data/README instead. ----
+data/
+# Keep a tracked pointer so the folder/instructions stay in the repo:
+!data/README
+!data/README.md
+
+# ---- Results: reproducible artifacts; weights/large dumps are not tracked ----
+results/_legacy/
+results/**/models/
+*.pth
+*.onnx
+*.engine
+*.plan
+results/**/loso_detailed_predictions_*.csv
+# (loss/roc PNGs and loso_summary_*.csv are small — keep them if you want figures
+#  tracked; otherwise add: results/**/curves/ and results/**/*.csv)
+
+# ---- Edge / deployment build artifacts ----
+edge/**/*.onnx
+edge/**/*.engine
+edge/**/*.plan
+edge/build/
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
