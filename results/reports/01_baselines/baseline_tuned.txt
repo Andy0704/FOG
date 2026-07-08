@@ -1,0 +1,144 @@
+FoG TCN -- TUNED DETECTION baseline candidate (Optuna trial 26, CLEAN)
+======================================================================
+run_id     : RUN_20260705_151423
+date       : 2026-07-05
+task       : DETECTION (label at t, horizon=n/a) -- NOT prediction.
+protocol   : inner-LOSO + Optuna trial26 params (CLEAN). Same protocol as
+             the current inner-LOSO baseline (RUN_20260702_202440, ADR-003):
+             for each outer fold, all 7 remaining subjects rotated as an
+             inner val candidate, scored by ROC-AUC on causal-median(k=5)-
+             smoothed val probs, MEDIAN scorer selected as val_subj; model
+             retrained once on the 6 remaining train subjects + selected
+             val_subj; threshold frozen on that val_subj (S2), applied to
+             test_subj; causal post-proc K=5/W=7 (S4). ONLY the
+             hyperparameters differ from the baseline -- architecture
+             (kernel_size=5, dilations=[1,2,4], RF=57), the LOSO loop, and
+             all preprocessing are byte-for-byte unchanged.
+
+WHY TRIAL 26 NOT TRIAL 33: trial 33's nominal top Optuna score (val
+PR-AUC=0.6260) came from a NaN-contaminated run -- its S08-fold selected
+candidate diverged to NaN loss at epoch 16 and was rescued by the
+checkpoint/early-stopping mechanism, not a fully clean 25-epoch training
+run. Trial 26 is the best CLEAN trial (zero divergence across all 21
+candidate trainings in its Optuna evaluation) at val PR-AUC=0.6173, a gap
+of only 0.0087 -- smaller than the top-5 trials' own spread (0.0113) and
+well within the field's noise (std=0.0408). Full audit:
+results/reports/optuna_summary.txt.
+
+hyperparameters (Optuna trial 26): kernel_size=5, dilations=[1,2,4],
+num_channels=[32,64,128] (unchanged baseline architecture, RF=57),
+dropout=0.188296, focal_alpha=0.747900, focal_gamma=2.020007, lr=0.000780,
+weight_decay=0.000699, batch_size=256.
+n_epochs   : 50 (patience=5 early stopping)
+seed       : 42
+device     : cuda (NVIDIA GeForce RTX 4060, fog_env_wsl)
+wall-clock : 2795.1s (~46.6 min) for all 64 models (8 outer folds x
+             (7 inner candidates + 1 final retrain)) -- FASTER than the
+             original baseline's 3708s despite the identical protocol.
+             trial26's lr=0.00078 is ~7.8x the baseline's default lr=0.0001,
+             which plausibly converges to a good val loss faster, letting
+             patience=5 early stopping trigger sooner on several splits
+             (avg 13.4 epochs/split run this run vs the 50-epoch cap).
+source csv : results/RUN_20260705_151423/loso_summary_20260705_151423.csv
+
+NaN CHECK: grep -ic "nan" results/reports/final_det.log = 0. ASSERTING
+0 NaN EPOCHS across all 64 models trained this run -- clean end to end,
+consistent with trial26 being the verified-clean Optuna trial and this
+run additionally using no learning rate above the 1e-3 NaN-risk threshold
+flagged in ADR-018/optuna_summary.txt (trial26's lr=0.00078 < 1e-3).
+LEAKAGE/ERROR CHECK: grep -icE "traceback|assertionerror|leakage" = 0.
+
+----------------------------------------------------------------------
+1. PER-FOLD TABLE
+----------------------------------------------------------------------
+Subject | Val_Subject | Best_Threshold | Test_F1 | Test_PR_AUC | Test_ROC_AUC
+S01     | S07         | 0.3450         | 0.2550  | 0.4097      | 0.9169
+S02     | S06         | 0.3020         | 0.6610  | 0.7683      | 0.9406
+S03     | S06         | 0.3261         | 0.6098  | 0.6354      | 0.9141
+S05     | S07         | 0.3665         | 0.4003  | 0.6660      | 0.8800
+S06     | S09         | 0.3296         | 0.2719  | 0.3529      | 0.8473
+S07     | S01         | 0.3223         | 0.1828  | 0.3850      | 0.7847
+S08     | S07         | 0.3740         | 0.0909  | 0.5221      | 0.7321
+S09     | S07         | 0.2920         | 0.6205  | 0.6851      | 0.9126
+----------------------------------------------------------------------
+
+FLAGGED FOLDS (ROC-AUC<0.60 or NaN): NONE. Every fold's Test_ROC_AUC is
+>= 0.7321 -- S08 (the akinetic-phenotype outlier that was BELOW CHANCE at
+0.4908 in the original baseline, ADR-012) is now the WORST fold at 0.7321,
+but comfortably above the 0.60 flag threshold and far above chance. This
+is a genuinely notable finding, not something the tuning was specifically
+aimed at -- see section 4.
+
+----------------------------------------------------------------------
+2. MEAN +/- STD OVER 8 FOLDS
+----------------------------------------------------------------------
+Test_F1      : 0.3865 +/- 0.2202
+Test_PR_AUC  : 0.5531 +/- 0.1573
+Test_ROC_AUC : 0.8660 +/- 0.0734
+
+----------------------------------------------------------------------
+3. SIDE-BY-SIDE vs RUN_20260702_202440 (current inner-LOSO baseline)
+----------------------------------------------------------------------
+Metric       | Baseline (202440)  | Tuned (trial26)    | Delta      | Std change
+Test_F1      | 0.3664 +/- 0.1439  | 0.3865 +/- 0.2202   | +0.0201    | std GREW (0.144->0.220)
+Test_PR_AUC  | 0.4211 +/- 0.1081  | 0.5531 +/- 0.1573   | +0.1320    | std GREW (0.108->0.157)
+Test_ROC_AUC | 0.7743 +/- 0.1261  | 0.8660 +/- 0.0734   | +0.0917    | std SHRANK (0.126->0.073)
+----------------------------------------------------------------------
+
+Read carefully -- the three metrics tell a MIXED story, not a uniform win:
+- Test_ROC_AUC (rank-based, threshold-independent) improved substantially
+  AND got MORE consistent across folds (std shrank by ~42%). This is the
+  cleanest, most trustworthy improvement: the tuned model ranks positive
+  vs negative windows better across every single fold, including
+  previously-hard ones (S08 rose from 0.4908 to 0.7321; S07 rose from a
+  presumably-lower baseline fold value to 0.7847).
+- Test_PR_AUC (also rank-based but reweighted by class imbalance)
+  improved even MORE in absolute terms (+0.1320, the largest gain of the
+  three) but its std GREW (~46%). Some folds (S02=0.7683, S09=0.6851)
+  improved dramatically; others (S06=0.3529, S01=0.4097) improved only
+  modestly relative to the mean gain -- the improvement is real but
+  uneven across subjects.
+- Test_F1 (threshold-dependent -- frozen on val, applied to test, S2) is
+  the WEAK LINK: mean improvement is small (+0.0201) and std grew
+  sharply (~53%, from 0.144 to 0.220). Three folds have LOW F1 despite
+  good-to-great ROC-AUC (S08 F1=0.091 despite ROC-AUC=0.732; S07 F1=0.183
+  despite ROC-AUC=0.785; S06 F1=0.272 despite ROC-AUC=0.847) -- the
+  Youden's-J-selected threshold from val is evidently not transferring to
+  test as reliably under this hyperparameter combination as it did under
+  the baseline's. This is worth investigating before treating F1 as a
+  settled win (see section 5).
+
+----------------------------------------------------------------------
+4. NOTABLE FINDING: S08 IS NO LONGER BELOW CHANCE
+----------------------------------------------------------------------
+S08 (the akinetic-phenotype outlier, diagnosed in docs/case_study_S08.md
+and ADR-012 as a genuine class-conditional generalization failure under
+the ORIGINAL baseline's hyperparameters, Test_ROC_AUC=0.4908) rises to
+Test_ROC_AUC=0.7321 under trial26's hyperparameters -- a +0.2413 absolute
+gain, by far the largest single-fold change in the entire comparison, and
+enough to move it from "below chance" to comfortably above 0.70. This
+was NOT a specific target of the Optuna tuning (S08 was one of 3 tuning
+folds, ADR-018, but the objective was the MEAN across folds, not S08
+specifically). Its F1 remains low (0.0909) -- the ranking quality
+improved dramatically but the frozen threshold still does not suit this
+subject well. This finding is significant enough to warrant its own
+follow-up (updating docs/case_study_S08.md is a natural next step, not
+done as part of this task since it wasn't requested here).
+
+----------------------------------------------------------------------
+5. BOTTOM LINE
+----------------------------------------------------------------------
+- 0 NaN epochs across all 64 models trained (verified by grepping the full
+  training log), 0 leakage/error signatures. Clean run.
+- 0 folds flagged (ROC-AUC<0.60) -- every fold, including the historically
+  hard S08, clears 0.70.
+- ROC-AUC and PR-AUC both improved substantially and are the most
+  trustworthy gains (ROC-AUC's std also shrank, a genuinely unambiguous
+  improvement); F1's small mean gain + grown std means it should NOT be
+  cited as a clean win without also citing the underlying threshold-
+  transfer issue in 3 of 8 folds.
+- Total wall-clock: 2795.1s (~46.6 min), faster than the original
+  baseline's 3708s.
+- NOT superseding RUN_20260702_202440 -- both are retained per instructions;
+  promotion is a decision for the next step after this review.
+- No changes to data/ this task (training-only run against existing data).

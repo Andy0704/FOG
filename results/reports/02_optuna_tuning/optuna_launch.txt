@@ -1,0 +1,161 @@
+Optuna DETECTION hyperparameter study -- OVERNIGHT LAUNCH (ADR-018)
+======================================================================
+date       : 2026-07-04
+task       : DETECTION (this study tunes the DETECTION baseline;
+             RUN_20260702_202440, inner-LOSO, ROC-AUC 0.7743, is the
+             reference it is trying to beat). NOT the PREDICTION task.
+environment : WSL, fog_env_wsl venv, PYTHONUTF8=1, PYTHONUNBUFFERED=1.
+             GPU = NVIDIA RTX 4060 (cuda).
+confirmed  : NO changes to data/ or ROOT_DIR/logging. src/ change is
+             limited to src/tune_optuna.py itself (the tuning script this
+             task is about) -- src/run_loso.py, basic_tcn.py,
+             fog_preprocessing.py, trainer_tcn.py are untouched by this
+             task (their earlier diffs predate this task).
+
+----------------------------------------------------------------------
+1. WHAT CHANGED IN src/tune_optuna.py (surgical, additive)
+----------------------------------------------------------------------
+- New inner_val_score_prauc(va_probs, va_labels): PR-AUC analogue of
+  run_loso.inner_val_score() (ROC-AUC). Same causal-median(k=5) smoothing.
+  Does NOT touch run_loso.py -- that file's own val_subj selection rule for
+  the production DETECTION pipeline stays ROC-AUC-based (ADR-003),
+  unchanged. This is a NEW, separate scoring function used only by the
+  Optuna objective.
+- make_objective() / run_smoke() / run_full_study() / _build_study()
+  generalized to accept score_fn/metric_name/n_startup_trials as
+  parameters (defaults preserve the exact original ADR-013 ROC-AUC
+  behavior for any old caller). The median-SELECTION RULE itself
+  (rank inner candidates by score_fn, pick the median) is UNCHANGED --
+  only which scoring function feeds it differs.
+- New --full CLI flag (python src/tune_optuna.py --full) that launches
+  the PR-AUC study with this task's exact config (named constants
+  PRAUC_TUNING_FOLDS/PRAUC_N_TRIALS/PRAUC_EPOCH_CAP/PRAUC_N_STARTUP_TRIALS
+  at the bottom of the file, so DECISIONS.md/PROJECT_STATUS.md can cite
+  the same values the launch actually used). Bare `python src/tune_optuna.py`
+  (no flag) still runs only the cheap original ROC-AUC smoke -- unchanged,
+  reproducible per ADR-013.
+- Search space UNCHANGED: same 4 RF<=64 arch combos, same dropout/focal_
+  alpha/focal_gamma/lr/weight_decay/batch_size ranges as ADR-013.
+- Per-call unique checkpoint path (results/_tmp_checkpoints/ckpt_<pid>_
+  <uuid>.pth, from the earlier checkpoint-collision fix) is inherited
+  unchanged via run_split() -- this study is safe to run even if another
+  training job runs concurrently.
+
+----------------------------------------------------------------------
+2. SMOKE RESULT (run interactively BEFORE deciding to launch, 2 trials x
+   1 outer fold [S01] x 5-epoch cap, objective=val_PRAUC)
+----------------------------------------------------------------------
+RF GUARD: all 4 valid arch combos (K3/[1,2,4] RF=29, K3/[1,4,8] RF=53,
+K3/[1,2,8] RF=45, K5/[1,2,4] RF=57) pass; the known-bad combo (K5/[1,4,8],
+RF=105) is correctly REJECTED -- BasicTCN raised ValueError as designed.
+
+OBJECTIVE READS val PR-AUC: CONFIRMED. Trial 0 finished with value
+0.620054 (val-only mean inner PRAUC), trial 1 with value 0.514488 --
+these are PR-AUC values (0-1 range, imbalance-sensitive), distinct from
+the ROC-AUC objective used in the original ADR-013 smoke. Printed
+explicitly: "Best value (val-only mean inner PRAUC): 0.6201".
+
+TEST-NOT-ENTERED CONFIRMED: the objective's leakage assertion
+("test_subj not in inner_train_subjs and candidate != test_subj") fires
+on every inner candidate of every fold of every trial (14 models trained
+this smoke: 2 trials x 1 fold x 7 inner candidates) -- ZERO
+AssertionErrors raised, both trials reached COMPLETE state
+(2/2 trials COMPLETE). test_subj=S01's data was never loaded by build_xy()
+or run_split() at any point (S01 only ever defined the eligible inner-
+candidate pool, never entered training/val itself).
+
+TRIALS PERSIST: study_smoke_prauc.db (sqlite) and
+trials_log_smoke_prauc.csv both written and confirmed on disk.
+
+SMOKE VERDICT: PASSED on all four criteria. Proceeded to launch the full
+study (had the smoke failed on any criterion, the full study would NOT
+have been launched, per instructions).
+
+----------------------------------------------------------------------
+3. ESTIMATED WALL-CLOCK FOR THE FULL 40-TRIAL / 3-FOLD / 25-EPOCH STUDY
+----------------------------------------------------------------------
+Projected from the smoke's observed per-epoch cost (14 models, 96.4s total,
+avg 1.38s/epoch):
+
+  40 trials x 3 outer folds x 7 inner candidates x 25 epochs
+  = 28,917s (~482.0 min, ~8.03 hr) -- CONSERVATIVE UPPER BOUND
+
+This upper bound assumes every trial runs every fold to completion at the
+full 25-epoch cap with NO early stopping and NO pruning benefit. In
+practice:
+  - patience=5 early stopping will trigger before epoch 25 on many splits
+    (the smoke's 5-epoch cap was too short for patience=5 to ever trigger
+    -- most splits were still within their patience window at epoch 5 --
+    so this upper bound does not yet reflect any early-stopping savings;
+    expect real wall-clock to be MEANINGFULLY BELOW 8.03hr once the
+    25-epoch cap gives patience=5 room to actually fire).
+  - MedianPruner (n_startup_trials=8, n_warmup_steps=1) can abort a
+    clearly-bad trial after just 1 of the 3 tuning folds, once >=8 trials
+    have completed and given the pruner a real median to compare against
+    -- this only helps from roughly trial 9 onward.
+  - For reference, a lighter config (15 trials x 1 fold x 25 epochs) upper
+    bound is ~1.00hr -- included by the harness as cost context, not a
+    recommendation to switch (the stated 40/3/25 config was launched as
+    specified).
+
+Given "the full night" is available, ~8hr upper bound (likely less in
+practice) fits comfortably within an overnight window.
+
+----------------------------------------------------------------------
+4. FULL STUDY LAUNCH -- CONFIRMED ALIVE
+----------------------------------------------------------------------
+Launched detached in tmux session "optuna":
+  tmux new-session -d -s optuna "source fog_env_wsl/bin/activate && \
+    export PYTHONUTF8=1 && export PYTHONUNBUFFERED=1 && \
+    python -u src/tune_optuna.py --full > results/reports/optuna_full.log 2>&1"
+
+(Invocation adjusted from the suggested `python -u -m src.tune_optuna --full`
+to `python -u src/tune_optuna.py --full`, matching how this codebase's
+scripts have always been run -- sys.path.insert(0, 'src') flat imports
+inside the script itself, not a `-m` package invocation. tune_optuna.py's
+own ROOT_DIR/sys.path setup is unaffected by working directory.)
+
+Confirmed alive:
+  - tmux session "optuna": 1 window, running.
+  - Process: python -u src/tune_optuna.py --full (PID visible, cuda device
+    active, GPU memory in use).
+  - Log header confirms exact launched config: "OPTUNA FULL STUDY: 40
+    trials, epoch_cap=25, objective=val_prauc, n_startup_trials=8" and
+    "Tuning outer-fold subset (REDUCED protocol, test subjects held out
+    from tuning entirely): ['S01', 'S03', 'S08']" -- matches spec exactly
+    (S08 deliberately included).
+  - First trial's first inner candidate is mid-training (epoch 7/25
+    observed at check time), loss decreasing normally, no errors.
+  - results/optuna/study_full_prauc.db created and being written to
+    (sqlite, crash-safe -- Optuna persists trial state incrementally).
+
+Per-trial CSV path (crash-safe incremental append, same pattern as
+run_loso.py): results/optuna/trials_log_full_prauc.csv -- will appear
+after the first outer fold's 7 inner candidates complete for trial 0 (not
+yet created at launch-confirmation time, expected).
+
+----------------------------------------------------------------------
+5. NOT DONE TONIGHT (deferred, as instructed)
+----------------------------------------------------------------------
+- The final 50-epoch run with the best found params (run_finalize(),
+  already implemented, reuses run_loso.main() unchanged) -- NOT called.
+- Any precision-aware threshold work -- NOT started.
+- Tonight is the search only, unattended, in tmux session "optuna".
+
+----------------------------------------------------------------------
+6. BOTTOM LINE
+----------------------------------------------------------------------
+- Smoke PASSED all 4 required checks (PR-AUC objective, RF guard,
+  test-not-entered, trial persistence) -- verified interactively before
+  launch, not assumed.
+- Full study LAUNCHED and CONFIRMED ALIVE in tmux session "optuna",
+  writing to results/reports/optuna_full.log, config matches spec exactly
+  (40 trials, tuning_folds=[S01,S03,S08], epoch_cap=25, n_startup_trials=8,
+  seed=42, objective=val PR-AUC).
+- Estimated wall-clock: ~8.03hr conservative upper bound, likely less in
+  practice once early stopping/pruning kick in at the 25-epoch cap.
+- Per-trial CSV: results/optuna/trials_log_full_prauc.csv (crash-safe,
+  appears after trial 0's first fold completes).
+- Study database: results/optuna/study_full_prauc.db (sqlite, resumable).
+- No changes to data/ or ROOT_DIR/logging; src/ change limited to
+  src/tune_optuna.py.

@@ -77,6 +77,12 @@ behind every methodological choice, EXPERIMENTS.md for the run log.
 - **R12 Fail loud.** "Run finished" is wrong if a subject was silently NaN'd or
   skipped. "Metrics improved" is wrong if the threshold was picked on test.
   Default to surfacing uncertainty.
+- **R13 (added 2026-07-05)**: When encountering an unknown filesystem state (ghost entries,
+  stat/ls disagreement, unexpected orphans), STOP and report. Never invoke rm/rmdir/
+  git rm to "clean up" a state you can't fully explain. This binds strictly for any
+  path under data/, src/, results/, or any location whose contents pre-exist the
+  current session. The loss of optuna_smoke_raw.log during the 2026-07-05 reports/
+  reorg is the precedent.
 
 ## 3. Engineering standards
 - PyTorch 2.x, scipy, torchmetrics, pandas, numpy. Training GPU = local RTX 4060.

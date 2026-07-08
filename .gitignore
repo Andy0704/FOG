@@ -18,6 +18,7 @@ __pycache__/
 # ---- Virtual environments (do NOT commit; reproduce via requirements.txt) ----
 fog_env_64/
 fog_env/
+fog_env_wsl/
 .venv/
 venv/
 env/
@@ -31,6 +32,8 @@ data/
 # ---- Results: reproducible artifacts; weights/large dumps are not tracked ----
 results/_legacy/
 results/**/models/
+results/_tmp_checkpoints/
+results/optuna/
 *.pth
 *.onnx
 *.engine
@@ -50,3 +53,10 @@ edge/build/
 Thumbs.db
 .vscode/
 .idea/
+
+# reports/: track txt summaries + case-study figures + references; ignore raw run logs
+# (no broader "results/" rule exists above, so no negation is needed to un-ignore
+# results/reports/ -- .txt/.png/.md there are tracked by default already; these two
+# lines only add the raw-log ignore rules, policy choice B)
+results/reports/06_run_logs/*.log
+results/reports/*.log

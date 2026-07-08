@@ -1,0 +1,159 @@
+FoG TCN -- PREDICTION task smoke test (1-fold, test=S01, DIAGNOSTIC ONLY)
+======================================================================
+run_id     : RUN_20260703_160327
+date       : 2026-07-03
+task       : PREDICTION (label shifted +H before onset, horizon=64 samples
+             = 1.00s @ 64Hz). Positive class = windows whose END-POINT sample
+             falls within the horizon before a FoG onset. See ADR-014 for the
+             full label/exclusion-mask definition.
+protocol   : same inner-LOSO val_subj selection as the DETECTION baseline
+             (rotate val_subj over the 7 remaining subjects, score by
+             ROC-AUC on causal-median(k=5)-smoothed val probs, select the
+             MEDIAN scorer) -- reused UNCHANGED; only the label construction
+             differs (fog_preprocessing.FoGPreprocessor.make_prediction_labels
+             + run_loso.build_prediction_records / windows_from_records).
+n_epochs   : 10 (smoke cap, patience=5 early stopping) -- NOT the n_epochs=50
+             used for the official DETECTION baseline; this run is a
+             pipeline-correctness + effect-size check, not a tuned result.
+seed       : 42
+device     : cuda (NVIDIA GeForce RTX 4060, fog_env_wsl)
+outer fold : test_subj = S01 ONLY (per instructions: do not run the full
+             8-fold until this smoke is reviewed)
+source csv : results/RUN_20260703_160327/loso_summary_20260703_160327.csv
+
+----------------------------------------------------------------------
+1. PIPELINE CORRECTNESS CHECKS
+----------------------------------------------------------------------
+[RF]      57 <= window_size 64 -- confirmed on every one of the 8 models
+          trained this run (7 inner candidates + 1 final retrain), same as
+          the DETECTION baseline (ADR-005, unaffected by task).
+[LEAKAGE] No leakage assertion fired (test_subj=S01 never entered any
+          inner-candidate train/val split or the final train/val split;
+          checked at both inner-candidate and outer level, ADR-003 guard
+          reused unchanged).
+[DETECTION PATH] Re-ran run_loso.main() with default task="detection",
+          n_epochs=2, subjects_to_run=['S01'] after this change: RF=57,
+          no errors, Test_F1=0.1903 / Test_ROC_AUC=0.6919 (2-epoch smoke,
+          not comparable to the 50-epoch baseline number, but confirms the
+          DETECTION path still runs end-to-end unmodified).
+
+----------------------------------------------------------------------
+2. CLASS BALANCE AFTER PRE-FOG RELABELING + EPISODE EXCLUSION
+----------------------------------------------------------------------
+Exclusion mask (during-freeze samples, incl. onset) is consistent across all
+candidates that share the same underlying 13 subject-files (train pool never
+includes S01): total_samples=744028, excluded=104091 (13.99%), onsets_detected=214.
+For the TEST subject alone (S01, 2 files): total_samples=121603,
+excluded=6694 (5.50%), onsets_detected=23. Non-zero and materially large in
+both cases -- confirms the exclusion mask is actually removing freeze periods,
+not a no-op.
+
+Positive (pre-FoG) window counts per inner-LOSO val candidate (n_pos / total,
+pct) -- ALL are small relative to total windows, consistent with the horizon
+(64 samples = window_size = 1 step of the 32-sample stride) allowing only
+~1-2 positive-labeled windows per onset once the any-overlap exclusion around
+freeze periods is applied:
+  val=S02: pos=45   / 2420  (1.86%)
+  val=S03: pos=91   / 3347  (2.72%)
+  val=S05: pos=126  / 3104  (4.06%)
+  val=S06: pos=20   / 3695  (0.54%)  <- FLAG: borderline sparse (exactly at
+                                        the n_pos<20 smoke-warn threshold)
+  val=S07: pos=48   / 3007  (1.60%)  (this candidate was SELECTED as val_subj)
+  val=S08: pos=28   / 1108  (2.53%)
+  val=S09: pos=54   / 2888  (1.87%)
+  TEST=S01: pos=46  / 3547  (1.30%)
+  final TRAIN pool (6 subjects, val=S07 selected): pos=364 / 16562 (2.20%)
+
+FLAG: pre-FoG positive rate is ~1-4% of windows across every candidate and
+the TEST subject, versus DETECTION's ~19% positive rate (Daphnet's native
+81/19 imbalance, ADR/CLAUDE.md S6). This is a further 5-15x sparsification on
+top of an already-imbalanced problem. The absolute positive window COUNTS
+(20-126) are also small in absolute terms, not just percentage terms -- with
+only 8-10 subjects total this leaves little signal per fold for the model to
+learn a stable pre-FoG boundary from. This is exactly what horizon=1s @
+window=64/step=32 predicts: each onset contributes at most ~2 positive
+windows by construction. TAKE THIS AS A DIAGNOSTIC FINDING, not a bug -- it
+is an intrinsic property of the task definition (S3), not a preprocessing
+error.
+
+----------------------------------------------------------------------
+3. INNER-LOSO VAL SELECTION (test=S01)
+----------------------------------------------------------------------
+Candidate  | ROC-AUC(smoothed) | wall-clock | epochs_run
+S02        | 0.7643            | 30.2s      | 10
+S03        | 0.8450            | 24.6s      | 9  (early-stopped)
+S05        | 0.7278            | 28.8s      | 9  (early-stopped)
+S06        | 0.6423            | 27.0s      | 10
+S07        | 0.7292            | 28.1s      | 10   <- MEDIAN, selected
+S08        | 0.6769            | 21.5s      | 7  (early-stopped)
+S09        | 0.7790            | 28.2s      | 10
+
+Selected val_subj = S07 (median inner ROC-AUC rule, score=0.7292). Different
+from the DETECTION baseline's val_subj for S01 (S06, RUN_20260702_202440) --
+expected, since the inner-scoring here is computed on PREDICTION-task labels,
+not DETECTION labels; the two tasks can rank candidate val subjects
+differently.
+
+----------------------------------------------------------------------
+4. WINDOW-LEVEL METRICS (TEST=S01, frozen threshold from val=S07)
+----------------------------------------------------------------------
+Best_Threshold : 0.1915  (chosen on val=S07 via Youden's J on
+                 causal-median(k=5)-smoothed val probs, S2 -- threshold
+                 never touches TEST)
+Test_F1        : 0.0343
+Test_PR_AUC    : 0.0293
+Test_ROC_AUC   : 0.7304
+
+----------------------------------------------------------------------
+5. EPISODE-LEVEL METRICS (TEST=S01) -- NEW for PREDICTION task
+----------------------------------------------------------------------
+n_episodes_evaluated : 23  (all 23 onsets detected in S01's 2 files had
+                            >=1 valid pre-FoG window; skipped_no_window=0)
+Episode recall        : 0.7826  (18 / 23 onsets had >=1 positive prediction
+                            somewhere in their pre-FoG horizon window)
+Mean lead time         : 0.6970s  (averaged over the 18 hit episodes only;
+                            out of a maximum possible 1.00s horizon -- the
+                            model fires, on average, ~0.70s before onset when
+                            it fires at all)
+
+----------------------------------------------------------------------
+6. PREDICTION vs DETECTION -- S01, HOW FAR DID IT DROP
+----------------------------------------------------------------------
+DETECTION reference (RUN_20260702_202440, official baseline, 50 epochs,
+val=S06): Test_F1=0.3487, Test_PR_AUC=0.4032, Test_ROC_AUC=0.8774.
+This PREDICTION smoke (10 epochs, val=S07): Test_F1=0.0343,
+Test_PR_AUC=0.0293, Test_ROC_AUC=0.7304.
+
+  Metric        | DETECTION (S01) | PREDICTION (S01) | Delta      | Relative drop
+  Test_F1       | 0.3487           | 0.0343            | -0.3144    | -90.2%
+  Test_PR_AUC   | 0.4032           | 0.0293            | -0.3739    | -92.7%
+  Test_ROC_AUC  | 0.8774           | 0.7304            | -0.1470    | -16.8%
+
+CAVEATS on this comparison: (a) the PREDICTION run used n_epochs=10 (smoke
+cap) vs DETECTION's 50 -- some of the F1/PR-AUC gap likely narrows with full
+training, though the class-imbalance gap (1-4% vs ~19% positive) will not go
+away with more epochs; (b) different val_subj was selected (S07 vs S06) since
+inner scoring used PREDICTION-task labels; (c) window-level F1/PR-AUC are
+known to be harsh under this level of imbalance -- see the episode-level
+numbers in section 5, which tell a materially different (more encouraging)
+story: 78.3% of freeze episodes DID get at least one correct imminent-onset
+signal, with useful lead time (~0.70s of the 1.00s horizon).
+
+----------------------------------------------------------------------
+7. BOTTOM LINE
+----------------------------------------------------------------------
+- Pipeline is CORRECT: RF<=window holds, leakage guard holds, exclusion mask
+  demonstrably removes freeze periods (13.99%/5.50% of samples), onset
+  detection finds a sane number of episodes (214 across the 13-subject train
+  pool, 23 in S01 alone), DETECTION path is unmodified and still runs.
+- Window-level F1/PR-AUC collapse hard (-90%/-93%) under the PREDICTION
+  framing, driven mostly by the ~1-4% positive rate (5-15x sparser than
+  DETECTION's ~19%) rather than a broken label.
+- Episode-level recall (78.3%, mean lead 0.70s) is the more meaningful number
+  for this task and suggests the model IS picking up some pre-onset signal,
+  just not reliably enough window-by-window to score well on F1/PR-AUC.
+- Positive window counts per fold are SMALL in absolute terms (20-126); flag
+  this for the full 8-fold run -- some outer folds may have even sparser
+  inner candidates than S01's fold did.
+- Per instructions: full 8-fold run NOT launched. Awaiting review of this
+  smoke before proceeding.

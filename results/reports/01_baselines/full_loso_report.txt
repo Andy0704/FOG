@@ -1,0 +1,316 @@
+C:\Project\115Daphnet_FoG\src\run_loso.py:45: SyntaxWarning: invalid escape sequence '\s'
+  df = pd.read_csv(file_path, sep='\s+', header=None)
+[SEED] 42
+[TASK] DETECTION (label at t, horizon=n/a)
+[DEVICE] cuda
+實驗資料夾已建立: C:\Project\115Daphnet_FoG\results\RUN_20260702_151715
+找到 10 位受試者: ['S01', 'S02', 'S03', 'S04', 'S05', 'S06', 'S07', 'S08', 'S09', 'S10']
+FoG 受試者 (LOSO 迴圈): ['S01', 'S02', 'S03', 'S05', 'S06', 'S07', 'S08', 'S09']
+
+==============================
+開始執行 LOSO Fold: 測試受試者為 【S01】
+==============================
+Train subjects: ['S03', 'S05', 'S06', 'S07', 'S08', 'S09']
+Val subject:    S02
+Test subject:   S01
+[RF] 57 (<= 64)
+ 開始訓練 (Train: 20419 窗, Val: 2829 窗, Test: 3799 窗)...
+開始訓練，使用裝置: cuda
+DEBUG -> TP: 172, FP: 249, TN: 2169, FN: 239
+Epoch 1/50 | Train Loss: 0.1014 | Val Loss: 0.0646 | F1: 0.4135 | FPR: 0.1030
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 182, FP: 178, TN: 2240, FN: 229
+Epoch 2/50 | Train Loss: 0.0889 | Val Loss: 0.0598 | F1: 0.4721 | FPR: 0.0736
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 279, FP: 339, TN: 2079, FN: 132
+Epoch 3/50 | Train Loss: 0.0844 | Val Loss: 0.0572 | F1: 0.5423 | FPR: 0.1402
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 257, FP: 281, TN: 2137, FN: 154
+Epoch 4/50 | Train Loss: 0.0812 | Val Loss: 0.0552 | F1: 0.5416 | FPR: 0.1162
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 366, FP: 657, TN: 1761, FN: 45
+Epoch 5/50 | Train Loss: 0.0792 | Val Loss: 0.0562 | F1: 0.5105 | FPR: 0.2717
+Val Loss 未進步，容忍度: 1/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 327, FP: 381, TN: 2037, FN: 84
+Epoch 6/50 | Train Loss: 0.0774 | Val Loss: 0.0515 | F1: 0.5845 | FPR: 0.1576
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 350, FP: 428, TN: 1990, FN: 61
+Epoch 7/50 | Train Loss: 0.0757 | Val Loss: 0.0508 | F1: 0.5887 | FPR: 0.1770
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 363, FP: 464, TN: 1954, FN: 48
+Epoch 8/50 | Train Loss: 0.0738 | Val Loss: 0.0505 | F1: 0.5864 | FPR: 0.1919
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 365, FP: 468, TN: 1950, FN: 46
+Epoch 9/50 | Train Loss: 0.0731 | Val Loss: 0.0490 | F1: 0.5868 | FPR: 0.1935
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 374, FP: 506, TN: 1912, FN: 37
+Epoch 10/50 | Train Loss: 0.0707 | Val Loss: 0.0493 | F1: 0.5794 | FPR: 0.2093
+Val Loss 未進步，容忍度: 1/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 369, FP: 473, TN: 1945, FN: 42
+Epoch 11/50 | Train Loss: 0.0702 | Val Loss: 0.0477 | F1: 0.5890 | FPR: 0.1956
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 374, FP: 494, TN: 1924, FN: 37
+Epoch 12/50 | Train Loss: 0.0692 | Val Loss: 0.0480 | F1: 0.5848 | FPR: 0.2043
+Val Loss 未進步，容忍度: 1/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 373, FP: 491, TN: 1927, FN: 38
+Epoch 13/50 | Train Loss: 0.0687 | Val Loss: 0.0474 | F1: 0.5851 | FPR: 0.2031
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 370, FP: 486, TN: 1932, FN: 41
+Epoch 14/50 | Train Loss: 0.0680 | Val Loss: 0.0473 | F1: 0.5841 | FPR: 0.2010
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 375, FP: 502, TN: 1916, FN: 36
+Epoch 15/50 | Train Loss: 0.0668 | Val Loss: 0.0474 | F1: 0.5823 | FPR: 0.2076
+Val Loss 未進步，容忍度: 1/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 377, FP: 538, TN: 1880, FN: 34
+Epoch 16/50 | Train Loss: 0.0664 | Val Loss: 0.0479 | F1: 0.5686 | FPR: 0.2225
+Val Loss 未進步，容忍度: 2/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 379, FP: 559, TN: 1859, FN: 32
+Epoch 17/50 | Train Loss: 0.0657 | Val Loss: 0.0496 | F1: 0.5619 | FPR: 0.2312
+Val Loss 未進步，容忍度: 3/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 372, FP: 464, TN: 1954, FN: 39
+Epoch 18/50 | Train Loss: 0.0651 | Val Loss: 0.0468 | F1: 0.5966 | FPR: 0.1919
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 381, FP: 539, TN: 1879, FN: 30
+Epoch 19/50 | Train Loss: 0.0646 | Val Loss: 0.0480 | F1: 0.5725 | FPR: 0.2229
+Val Loss 未進步，容忍度: 1/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 370, FP: 470, TN: 1948, FN: 41
+Epoch 20/50 | Train Loss: 0.0632 | Val Loss: 0.0465 | F1: 0.5915 | FPR: 0.1944
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 375, FP: 496, TN: 1922, FN: 36
+Epoch 21/50 | Train Loss: 0.0629 | Val Loss: 0.0475 | F1: 0.5850 | FPR: 0.2051
+Val Loss 未進步，容忍度: 1/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 378, FP: 509, TN: 1909, FN: 33
+Epoch 22/50 | Train Loss: 0.0625 | Val Loss: 0.0480 | F1: 0.5824 | FPR: 0.2105
+Val Loss 未進步，容忍度: 2/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 376, FP: 483, TN: 1935, FN: 35
+Epoch 23/50 | Train Loss: 0.0612 | Val Loss: 0.0466 | F1: 0.5921 | FPR: 0.1998
+Val Loss 未進步，容忍度: 3/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 373, FP: 479, TN: 1939, FN: 38
+Epoch 24/50 | Train Loss: 0.0614 | Val Loss: 0.0466 | F1: 0.5907 | FPR: 0.1981
+Val Loss 未進步，容忍度: 4/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 369, FP: 436, TN: 1982, FN: 42
+Epoch 25/50 | Train Loss: 0.0610 | Val Loss: 0.0456 | F1: 0.6069 | FPR: 0.1803
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 381, FP: 517, TN: 1901, FN: 30
+Epoch 26/50 | Train Loss: 0.0604 | Val Loss: 0.0481 | F1: 0.5821 | FPR: 0.2138
+Val Loss 未進步，容忍度: 1/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 377, FP: 490, TN: 1928, FN: 34
+Epoch 27/50 | Train Loss: 0.0598 | Val Loss: 0.0467 | F1: 0.5900 | FPR: 0.2026
+Val Loss 未進步，容忍度: 2/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 368, FP: 444, TN: 1974, FN: 43
+Epoch 28/50 | Train Loss: 0.0591 | Val Loss: 0.0451 | F1: 0.6018 | FPR: 0.1836
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 377, FP: 480, TN: 1938, FN: 34
+Epoch 29/50 | Train Loss: 0.0585 | Val Loss: 0.0461 | F1: 0.5946 | FPR: 0.1985
+Val Loss 未進步，容忍度: 1/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 376, FP: 474, TN: 1944, FN: 35
+Epoch 30/50 | Train Loss: 0.0583 | Val Loss: 0.0459 | F1: 0.5964 | FPR: 0.1960
+Val Loss 未進步，容忍度: 2/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 388, FP: 559, TN: 1859, FN: 23
+Epoch 31/50 | Train Loss: 0.0578 | Val Loss: 0.0496 | F1: 0.5714 | FPR: 0.2312
+Val Loss 未進步，容忍度: 3/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 383, FP: 496, TN: 1922, FN: 28
+Epoch 32/50 | Train Loss: 0.0574 | Val Loss: 0.0463 | F1: 0.5938 | FPR: 0.2051
+Val Loss 未進步，容忍度: 4/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 380, FP: 504, TN: 1914, FN: 31
+Epoch 33/50 | Train Loss: 0.0571 | Val Loss: 0.0469 | F1: 0.5869 | FPR: 0.2084
+Val Loss 未進步，容忍度: 5/5
+觸發 Early Stopping，提早結束訓練！
+已載入 S01 折的最佳模型 (val_subj=S02) 進行評估
+【S01】 (val=S02) 凍結 Threshold: 0.4248
+【S01】 Test_F1: 0.3098, Test_PR_AUC: 0.3763, Test_ROC_AUC: 0.8823
+ 已儲存 ROC 圖: C:\Project\115Daphnet_FoG\results\RUN_20260702_151715\curves\roc_S01.png
+
+==============================
+開始執行 LOSO Fold: 測試受試者為 【S02】
+==============================
+Train subjects: ['S03', 'S05', 'S06', 'S07', 'S08', 'S09']
+Val subject:    S01
+Test subject:   S02
+[RF] 57 (<= 64)
+ 開始訓練 (Train: 20419 窗, Val: 3799 窗, Test: 2829 窗)...
+開始訓練，使用裝置: cuda
+DEBUG -> TP: 48, FP: 669, TN: 2879, FN: 203
+Epoch 1/50 | Train Loss: 0.1033 | Val Loss: 0.0610 | F1: 0.0992 | FPR: 0.1886
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 73, FP: 783, TN: 2765, FN: 178
+Epoch 2/50 | Train Loss: 0.0892 | Val Loss: 0.0611 | F1: 0.1319 | FPR: 0.2207
+Val Loss 未進步，容忍度: 1/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 114, FP: 1013, TN: 2535, FN: 137
+Epoch 3/50 | Train Loss: 0.0839 | Val Loss: 0.0676 | F1: 0.1655 | FPR: 0.2855
+Val Loss 未進步，容忍度: 2/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 113, FP: 1001, TN: 2547, FN: 138
+Epoch 4/50 | Train Loss: 0.0810 | Val Loss: 0.0646 | F1: 0.1656 | FPR: 0.2821
+Val Loss 未進步，容忍度: 3/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 117, FP: 948, TN: 2600, FN: 134
+Epoch 5/50 | Train Loss: 0.0778 | Val Loss: 0.0628 | F1: 0.1778 | FPR: 0.2672
+Val Loss 未進步，容忍度: 4/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 124, FP: 969, TN: 2579, FN: 127
+Epoch 6/50 | Train Loss: 0.0753 | Val Loss: 0.0634 | F1: 0.1845 | FPR: 0.2731
+Val Loss 未進步，容忍度: 5/5
+觸發 Early Stopping，提早結束訓練！
+已載入 S02 折的最佳模型 (val_subj=S01) 進行評估
+【S02】 (val=S01) 凍結 Threshold: 0.3259
+【S02】 Test_F1: 0.3354, Test_PR_AUC: 0.3116, Test_ROC_AUC: 0.7735
+ 已儲存 ROC 圖: C:\Project\115Daphnet_FoG\results\RUN_20260702_151715\curves\roc_S02.png
+
+==============================
+開始執行 LOSO Fold: 測試受試者為 【S03】
+==============================
+Train subjects: ['S02', 'S05', 'S06', 'S07', 'S08', 'S09']
+Val subject:    S01
+Test subject:   S03
+[RF] 57 (<= 64)
+ 開始訓練 (Train: 19229 窗, Val: 3799 窗, Test: 4019 窗)...
+開始訓練，使用裝置: cuda
+DEBUG -> TP: 100, FP: 826, TN: 2722, FN: 151
+Epoch 1/50 | Train Loss: 0.1302 | Val Loss: 0.0653 | F1: 0.1699 | FPR: 0.2328
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 84, FP: 731, TN: 2817, FN: 167
+Epoch 2/50 | Train Loss: 0.0921 | Val Loss: 0.0610 | F1: 0.1576 | FPR: 0.2060
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 54, FP: 439, TN: 3109, FN: 197
+Epoch 3/50 | Train Loss: 0.0865 | Val Loss: 0.0559 | F1: 0.1452 | FPR: 0.1237
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 82, FP: 640, TN: 2908, FN: 169
+Epoch 4/50 | Train Loss: 0.0827 | Val Loss: 0.0572 | F1: 0.1686 | FPR: 0.1804
+Val Loss 未進步，容忍度: 1/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 99, FP: 717, TN: 2831, FN: 152
+Epoch 5/50 | Train Loss: 0.0793 | Val Loss: 0.0575 | F1: 0.1856 | FPR: 0.2021
+Val Loss 未進步，容忍度: 2/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 111, FP: 768, TN: 2780, FN: 140
+Epoch 6/50 | Train Loss: 0.0779 | Val Loss: 0.0585 | F1: 0.1965 | FPR: 0.2165
+Val Loss 未進步，容忍度: 3/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 119, FP: 791, TN: 2757, FN: 132
+Epoch 7/50 | Train Loss: 0.0743 | Val Loss: 0.0583 | F1: 0.2050 | FPR: 0.2229
+Val Loss 未進步，容忍度: 4/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 138, FP: 909, TN: 2639, FN: 113
+Epoch 8/50 | Train Loss: 0.0733 | Val Loss: 0.0618 | F1: 0.2126 | FPR: 0.2562
+Val Loss 未進步，容忍度: 5/5
+觸發 Early Stopping，提早結束訓練！
+已載入 S03 折的最佳模型 (val_subj=S01) 進行評估
+【S03】 (val=S01) 凍結 Threshold: 0.3459
+【S03】 Test_F1: 0.5338, Test_PR_AUC: 0.4468, Test_ROC_AUC: 0.8391
+ 已儲存 ROC 圖: C:\Project\115Daphnet_FoG\results\RUN_20260702_151715\curves\roc_S03.png
+
+==============================
+開始執行 LOSO Fold: 測試受試者為 【S05】
+==============================
+Train subjects: ['S02', 'S03', 'S06', 'S07', 'S08', 'S09']
+Val subject:    S01
+Test subject:   S05
+[RF] 57 (<= 64)
+ 開始訓練 (Train: 19069 窗, Val: 3799 窗, Test: 4179 窗)...
+開始訓練，使用裝置: cuda
+DEBUG -> TP: 54, FP: 394, TN: 3154, FN: 197
+Epoch 1/50 | Train Loss: 0.1110 | Val Loss: 0.0542 | F1: 0.1545 | FPR: 0.1110
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 69, FP: 409, TN: 3139, FN: 182
+Epoch 2/50 | Train Loss: 0.0813 | Val Loss: 0.0530 | F1: 0.1893 | FPR: 0.1153
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 70, FP: 370, TN: 3178, FN: 181
+Epoch 3/50 | Train Loss: 0.0756 | Val Loss: 0.0514 | F1: 0.2026 | FPR: 0.1043
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 72, FP: 260, TN: 3288, FN: 179
+Epoch 4/50 | Train Loss: 0.0713 | Val Loss: 0.0491 | F1: 0.2470 | FPR: 0.0733
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 88, FP: 340, TN: 3208, FN: 163
+Epoch 5/50 | Train Loss: 0.0685 | Val Loss: 0.0485 | F1: 0.2592 | FPR: 0.0958
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 96, FP: 322, TN: 3226, FN: 155
+Epoch 6/50 | Train Loss: 0.0667 | Val Loss: 0.0479 | F1: 0.2870 | FPR: 0.0908
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 109, FP: 387, TN: 3161, FN: 142
+Epoch 7/50 | Train Loss: 0.0648 | Val Loss: 0.0480 | F1: 0.2918 | FPR: 0.1091
+Val Loss 未進步，容忍度: 1/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 99, FP: 306, TN: 3242, FN: 152
+Epoch 8/50 | Train Loss: 0.0638 | Val Loss: 0.0476 | F1: 0.3018 | FPR: 0.0862
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 113, FP: 445, TN: 3103, FN: 138
+Epoch 9/50 | Train Loss: 0.0626 | Val Loss: 0.0480 | F1: 0.2794 | FPR: 0.1254
+Val Loss 未進步，容忍度: 1/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 125, FP: 597, TN: 2951, FN: 126
+Epoch 10/50 | Train Loss: 0.0618 | Val Loss: 0.0496 | F1: 0.2569 | FPR: 0.1683
+Val Loss 未進步，容忍度: 2/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 126, FP: 514, TN: 3034, FN: 125
+Epoch 11/50 | Train Loss: 0.0601 | Val Loss: 0.0479 | F1: 0.2828 | FPR: 0.1449
+Val Loss 未進步，容忍度: 3/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 132, FP: 522, TN: 3026, FN: 119
+Epoch 12/50 | Train Loss: 0.0600 | Val Loss: 0.0480 | F1: 0.2917 | FPR: 0.1471
+Val Loss 未進步，容忍度: 4/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 116, FP: 424, TN: 3124, FN: 135
+Epoch 13/50 | Train Loss: 0.0589 | Val Loss: 0.0469 | F1: 0.2933 | FPR: 0.1195
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 121, FP: 333, TN: 3215, FN: 130
+Epoch 14/50 | Train Loss: 0.0577 | Val Loss: 0.0432 | F1: 0.3433 | FPR: 0.0939
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 127, FP: 419, TN: 3129, FN: 124
+Epoch 15/50 | Train Loss: 0.0572 | Val Loss: 0.0446 | F1: 0.3187 | FPR: 0.1181
+Val Loss 未進步，容忍度: 1/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 153, FP: 607, TN: 2941, FN: 98
+Epoch 16/50 | Train Loss: 0.0562 | Val Loss: 0.0479 | F1: 0.3027 | FPR: 0.1711
+Val Loss 未進步，容忍度: 2/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 162, FP: 556, TN: 2992, FN: 89
+Epoch 17/50 | Train Loss: 0.0563 | Val Loss: 0.0456 | F1: 0.3344 | FPR: 0.1567
+Val Loss 未進步，容忍度: 3/5
+🔍 正在載入最佳模型權重進行 ROC 分析...

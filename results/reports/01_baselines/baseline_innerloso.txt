@@ -1,0 +1,100 @@
+FoG TCN -- DETECTION baseline, inner-LOSO val selection (UNBIASED REFERENCE)
+======================================================================
+run_id     : RUN_20260702_202440
+date       : 2026-07-02
+task       : DETECTION (label at t, horizon=n/a)
+protocol   : inner-LOSO val selection (median inner ROC-AUC rule, ADR-003
+             Option 1) -- for each outer fold, all 7 remaining subjects were
+             rotated as an inner val candidate, scored by ROC-AUC on
+             causal-median(k=5)-smoothed val probs, and the MEDIAN scorer was
+             selected as val_subj; the model was then retrained once on the
+             6 remaining train subjects + selected val_subj, threshold frozen
+             on that val_subj, applied to test_subj (S2/S4 unchanged).
+n_epochs   : 50 (early stopping on selected val_subj, patience=5)
+seed       : 42
+device     : cuda (NVIDIA GeForce RTX 4060, fog_env_wsl, torch 2.5.1+cu121)
+total_wall_clock : 3708s (64 models trained: 8 outer folds x (7 inner + 1 final retrain))
+source csv : results/RUN_20260702_202440/loso_summary_20260702_202440.csv
+
+Per-fold table (8/8 FOG subjects, no NaN)
+----------------------------------------------------------------------
+Subject | Val_Subject_selected | Best_Threshold | Test_F1 | Test_PR_AUC | Test_ROC_AUC
+S01     | S06                  | 0.3584         | 0.3487  | 0.4032      | 0.8774
+S02     | S01                  | 0.3012         | 0.3293  | 0.4266      | 0.8014
+S03     | S01                  | 0.3065         | 0.4825  | 0.3979      | 0.8273
+S05     | S03                  | 0.3242         | 0.5105  | 0.6146      | 0.8264
+S06     | S01                  | 0.3478         | 0.2180  | 0.2365      | 0.7157
+S07     | S06                  | 0.3828         | 0.5029  | 0.5049      | 0.8770
+S08     | S06                  | 0.2946         | 0.1121  | 0.3738      | 0.4908
+S09     | S06                  | 0.3576         | 0.4275  | 0.4113      | 0.7784
+----------------------------------------------------------------------
+
+Mean +/- std over 8 folds (this run, RUN_20260702_202440)
+  Test_F1      : 0.3664 +/- 0.1439
+  Test_PR_AUC  : 0.4211 +/- 0.1081
+  Test_ROC_AUC : 0.7743 +/- 0.1261
+
+SIDE-BY-SIDE vs the fixed-val baseline (RUN_20260702_172209, val_subj=pool[0])
+----------------------------------------------------------------------
+Metric        | Fixed-val (172209)  | Inner-LOSO (202440) | Delta      | Std change
+Test_F1       | 0.2949 +/- 0.2061   | 0.3664 +/- 0.1439    | +0.0715    | std shrank
+Test_PR_AUC   | 0.3719 +/- 0.1511   | 0.4211 +/- 0.1081    | +0.0492    | std shrank
+Test_ROC_AUC  | 0.7249 +/- 0.1723   | 0.7743 +/- 0.1261    | +0.0494    | std shrank
+----------------------------------------------------------------------
+All three headline metrics improved (F1 +0.071, PR-AUC +0.049, ROC-AUC +0.049)
+AND all three std shrank (F1 std 0.206 -> 0.144, PR-AUC std 0.151 -> 0.108,
+ROC-AUC std 0.172 -> 0.126). The fixed-val protocol validated on S01 in 6 of 8
+folds (val_subj=pool[0] always defaulted to the alphabetically first non-test
+subject); the inner-LOSO protocol now distributes val_subj across S01
+(3 folds), S06 (4 folds), and S03 (1 fold) -- see findings below.
+Higher mean AND lower variance together indicate the old fixed-val selection
+was not just biased but was picking a systematically worse (or at least
+noisier) early-stopping/threshold point than a genuinely representative val
+subject would.
+
+inner_scores findings
+----------------------------------------------------------------------
+(a) S02 had the HIGHEST inner ROC-AUC score in every single fold where it was
+    a candidate (all 7 outer folds except test=S02 itself: 0.9515, 0.9623,
+    0.9555, 0.9617, 0.9614, 0.9638, 0.9628 for test=S01/S03/S05/S06/S07/S08/S09
+    respectively) -- yet S02 was NEVER selected as val_subj (0 of 8 folds).
+    This is exactly the failure mode the median rule is designed to avoid:
+    S02 is consistently the "luckiest" val candidate (easiest to validate on),
+    and a MAX-rule would have picked it every time, silently inflating the
+    reported baseline with an easy validation subject instead of a
+    representative one.
+
+(b) S01 no longer dominates the val role. Under the old fixed-val protocol,
+    val_subj = pool[0] defaulted to S01 in 6 of 8 folds (any fold where the
+    test subject was not S01 itself). Under inner-LOSO, S01 is selected in
+    only 3 of 8 folds (test=S02, S03, S06); S06 is now the most frequent
+    selection (4 of 8: test=S01, S07, S08, S09); S03 is selected once
+    (test=S05). No single subject captures anywhere near 75% of the val role
+    anymore.
+
+(c) S08 is the LOWEST-scoring inner val candidate in every fold where it was
+    a candidate (all 7 outer folds except test=S08 itself: 0.3491, 0.4183,
+    0.3759, 0.4941, 0.4338, 0.3990, 0.4973 for test=S01/S02/S03/S05/S06/S07/S09
+    respectively) -- consistently the worst subject to validate on, in
+    addition to being the worst subject to TEST on (Test_ROC_AUC=0.4908,
+    flagged below). This is consistent with the akinetic-freezing phenotype
+    finding in docs/case_study_S08.md: whatever makes S08 hard to generalize
+    TO also makes it hard to validate/early-stop ON, i.e. this is a genuine,
+    consistent property of S08's data, not an artifact of the outer-fold
+    test-time evaluation alone.
+
+Flagged folds (Test_ROC_AUC < 0.60 or NaN)
+----------------------------------------------------------------------
+  S08 : Test_ROC_AUC = 0.4908 (near-chance, < 0.60) FLAGGED
+        Consistent with docs/case_study_S08.md (akinetic freezing phenotype,
+        genuine class-conditional generalization failure, not a data defect).
+        Notably LESS below-chance than the fixed-val run (0.3599 there vs.
+        0.4908 here) -- the better val_subj selection (S06 instead of the old
+        S01) partially, but not fully, mitigates S08's difficulty.
+  No other subject has Test_ROC_AUC < 0.60.
+  No NaN values in this run (all 8 FOG subjects have both classes present).
+
+Status: this run (RUN_20260702_202440) is now the OFFICIAL reference baseline
+(PROJECT_STATUS.md section 3, DECISIONS.md ADR-003 FULLY RESOLVED). The
+fixed-val run (RUN_20260702_172209) is superseded but retained on disk for
+comparison.

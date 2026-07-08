@@ -4,7 +4,7 @@
 > + EXPERIMENTS.md alone. Update the "Last updated" line and the relevant section
 > at the end of every working session (R6/R10 in CLAUDE.md).
 
-**Last updated:** 2026-06-14 (initialized)
+**Last updated:** 2026-07-03 (inner-LOSO full 8-fold run RUN_20260702_202440 complete and promoted to the OFFICIAL reference baseline, ADR-003 FULLY RESOLVED — see §3/§4; supersedes fixed-val RUN_20260702_172209, retained for comparison; S08 diagnosis CLOSED — hard-but-valid akinetic phenotype, ADR-012, docs/case_study_S08.md; training env is WSL-native `fog_env_wsl`, CLI + training run in one shell, GPU-verified; PREDICTION task validated at FULL 8-fold scale as ADR-014 (RUN_20260703_173337, episode_recall=0.6981±0.1606 primary metric) — see §3 "PREDICTION BASELINE" and results/reports/01_baselines/baseline_prediction.txt; Optuna hyperparameter tuning added as ADR-013, src/tune_optuna.py, val-only objective — 2-trial smoke passed after fixing a checkpoint-path collision with the concurrent PREDICTION-task session (now fixed for both), full 30-trial study NOT yet launched pending approval, see §4 item 10 and results/reports/02_optuna_tuning/optuna_smoke.txt; DOC CONSOLIDATION PASS 2026-07-03 — §3 rewritten as a DETECTION-vs-PREDICTION side-by-side comparison table, ADR-015 added for the cross-task S08 finding, §4/§5 updated with the pre-FoG sparsity + S09 low-recall follow-up items; read-only on results/, no code or data changes; EDGE DEPLOYMENT SCAFFOLD 2026-07-03 — new edge/ package (ADR-016), hardware-independent parts of the Jetson pipeline built + smoke-tested on WSL: stream_infer.py + ras_cue.py + latency_harness.py PASS, export_onnx.py written but blocked on missing onnx/onnxruntime packages (exact pip line reported, not installed silently) — see §4 item 12, results/reports/04_edge_deployment/edge_scaffold.txt; no src/ or data/ changes; EDGE SCAFFOLD PART 2 2026-07-03 — onnx==1.22.0/onnxruntime==1.27.0 installed + in requirements.txt, ONNX export UNBLOCKED (max diff 1.192e-07), edge/stream_infer.py + edge/latency_harness.py gained --infer_step (ADR-017, decoupled from training STEP_SIZE=32): smaller infer_step improves sanity recall/lead time but shrinks the k=5/w=7 post-proc's real-time span, an OPEN tradeoff not yet resolved — see §4 item 12, results/reports/04_edge_deployment/edge_scaffold_2.txt; still no src/ or data/ changes; EDGE SCAFFOLD PART 3 2026-07-04 — RESOLVED the infer_step-vs-post-proc-span tradeoff: span-constant k/w derivation (ADR-017 extension) + refractory debounce in ras_cue.py, trigger-count spread shrank from 3.90x to 1.10x across infer_step; key finding is that most of the earlier "smaller infer_step improves recall" trend was a smoothing-span dilution artifact, not genuine cadence benefit (lead time IS a genuine benefit, recall is not); recommending infer_step=16/k=3/w=4/refractory_ms=2000 for tomorrow's demo, pending approval — see §4 item 12, results/reports/04_edge_deployment/edge_scaffold_3.txt; still no src/ or data/ changes; OPTUNA OVERNIGHT STUDY LAUNCHED 2026-07-04 (ADR-018) — scaled-up DETECTION tuning study (40 trials, PR-AUC objective, tuning_folds=[S01,S03,S08] deliberately including the S08 akinetic outlier, epoch_cap=25), PR-AUC smoke gate verified PASSED before launch, running detached in tmux session "optuna" (~8.03hr conservative upper bound wall-clock, likely less with early stopping/pruning) — see §4 item 10, results/reports/02_optuna_tuning/optuna_launch.txt; no data/ or ROOT_DIR/logging changes, src/ change limited to src/tune_optuna.py; JETSON PLATFORM CONSOLIDATED 2026-07-04 (ADR-019) — Yahboom Orin NX SUPER (JetPack 6.2/CUDA 12.6), Tailscale SSH access, ~/fog_edge/ workspace on-device, see new §9 "Edge deployment platform"; read-only doc update, no src/ or data/ changes; TUNED DETECTION CANDIDATE 2026-07-05 (ADR-020) — full 8-fold inner-LOSO run with Optuna trial26's CLEAN hyperparameters (RUN_20260705_151423): ROC-AUC 0.866+/-0.073 (+0.092, std shrank) and PR-AUC 0.553+/-0.157 (+0.132) both improved substantially vs the RUN_20260702_202440 baseline; F1 improved only marginally with grown std (3 folds' frozen threshold doesn't transfer well, flagged as §4 item 13); S08 no longer below chance (0.491->0.732); 0 NaN, 0 leakage; does NOT supersede the baseline, both retained — see §3, results/reports/01_baselines/baseline_tuned.txt; no data/ or src/ changes -- new scripts/launch_final_detection_trial26.sh only calls the existing run_loso.main() with different hyperparameters, no logic duplicated; JETSON DEPLOYMENT CONSOLIDATED 2026-07-05/06 (ADR-021/ADR-022) -- Jetson deployment infrastructure DONE: env verified (JetPack 6.2/TRT 10.3.0/onnxruntime 1.18.0 CPU/numpy 1.21.5, no torch), fog_tcn_fp32.engine adopted as the deployment target over FP16 (no speedup on this model size, ADR-021), numerical parity vs source ONNX confirmed (max abs diff 3.51e-05), on-device latency measured (TRT forward median=0.6292ms, end-to-end compute median=1.8233ms, ~0.73% of the 250ms decision interval, ~2.2x faster than WSL/RTX4060 PyTorch) with 18/18 sanity-replay onsets caught -- see new §11; post-processing kept in pandas despite being ~2x slower than the forward pass, deferred per ADR-022 (still <2ms total, no urgency); §4 reordered -- the tuned-baseline F1/threshold-transfer investigation (item 11) BUMPED UP as still fully unresolved, Jetson deployment (item 13) marked infrastructure-complete with INT8 quantization/real IMU wiring/RAS hardware integration explicitly deferred; read-only on results/, no data/ or src/ changes)
 **Phase:** End of Phase 2 (Week 4–5), now pivoting toward prediction + edge deploy.
 **Hard deadline:** end of August — 推甄 portfolio + conference-grade write-up.
 
@@ -23,42 +23,351 @@
 - LOSO-CV outer loop; memory-efficient logging (list[dict]→DataFrame).
 - Temporal post-processing pipeline.
 
-## 3. Current best baseline (from loso_summary_20260519_165501.csv)
-8 FoG subjects (S04, S10 excluded — no FoG events):
+## 3. Current baselines — DETECTION and PREDICTION, side by side (2026-07-03)
+Two official, full 8-fold inner-LOSO baselines now exist for this repo, one
+per task (ADR-003 protocol reused unchanged between them; only the label
+construction differs, ADR-014). Both use n_epochs=50, seed=42, GPU/fog_env_wsl,
+inner-LOSO val_subj selection (median inner ROC-AUC rule).
 
-| metric | value | note |
-|---|---|---|
-| mean ROC-AUC | ~0.77 | range 0.39 (S08!) – 0.95 (S02) |
-| mean Best-F1 | ~0.50 | **swept on test subject — optimistic, see ADR-003** |
-| worst subject | S08 | AUC 0.39 (< chance) — investigate |
+| Metric (mean +/- std, 8 folds)       | DETECTION                | PREDICTION (horizon=1s)         |
+|---------------------------------------|---------------------------|-----------------------------------|
+| run_id                                | RUN_20260702_202440      | RUN_20260703_173337              |
+| PRIMARY metric                        | Test_F1 = 0.366 +/- 0.144 | episode_recall = 0.698 +/- 0.161 (0.734 pooled) |
+| ROC-AUC                               | 0.774 +/- 0.126          | 0.740 +/- 0.086                  |
+| PR-AUC                                | 0.421 +/- 0.108          | 0.093 +/- 0.058 (secondary, sparsity-limited) |
+| (task-specific 3rd metric)            | --                        | mean lead time = 0.715 +/- 0.070 s (of 1.00s horizon) |
+| wall-clock (64 models)                | 3708s (~61.8 min)         | 3664.1s (~61.1 min)              |
+| leakage assertions fired              | 0                          | 0                                  |
+| report                                | results/reports/01_baselines/baseline_innerloso.txt | results/reports/01_baselines/baseline_prediction.txt |
 
-Caveats (do not quote these numbers in a paper as-is):
-- Best-F1 uses a per-test-subject threshold → leakage (ADR-003).
-- AUC-ROC overstates under 81/19 imbalance → add PR-AUC (ADR-007).
+**DETECTION (RUN_20260702_202440)** supersedes the earlier fixed-val run
+RUN_20260702_172209 (Test_F1 0.295+/-0.206, val_subj=pool[0] biased toward
+S01 in 6/8 folds; retained on disk for comparison only, not deleted). The
+inner-LOSO fix raised all three metrics and shrank all three stds (see
+results/reports/01_baselines/baseline_innerloso.txt for the delta table). S08 diagnosis
+is CLOSED (docs/case_study_S08.md, ADR-012): below-chance AUC (0.4908) is
+hard-but-valid data from an akinetic (quiet) freezing phenotype the
+DETECTION model does not generalize to, not a sensor/label defect. Kept in
+the official mean per S6.
+
+**PREDICTION (RUN_20260703_173337, ADR-014 validated at full scale)** uses
+episode-level recall + lead time as the PRIMARY metric, not window-level
+F1/PR-AUC -- window-level metrics collapse under the ~1-4% pre-FoG positive
+rate (5-15x sparser than DETECTION's ~19%), an intrinsic consequence of
+horizon=window_size=64 + step_size=32 (each onset yields at most ~2 positive
+windows by construction), not a labeling defect; ROC-AUC does not collapse
+the same way and stays comparable to DETECTION in absolute terms. Flagged:
+S09 episode_recall=0.4074 (weakest fold, though its window-level PR-AUC/F1
+were near-best -- a specific missed-onset pattern, not a general failure);
+S06 borderline-sparse (n_pos=20, 10 onsets) but not below the n_pos<20
+threshold. No NaN folds, no skipped-onset folds.
+
+**Cross-task finding (S08):** below-chance under DETECTION (0.4908) but NOT
+below chance under PREDICTION (0.6659, episode_recall=0.7143, longest mean
+lead time of any fold at 0.8359s) -- see ADR-015 and docs/case_study_S08.md
+for the "two tasks read different parts of the movement signal"
+interpretation.
+
+**TUNED DETECTION baseline CANDIDATE (NOT superseding the baseline above):
+RUN_20260705_151423** (Optuna trial 26 hyperparameters -- CLEAN, ADR-018/020
+-- same architecture/protocol/causal post-proc as RUN_20260702_202440, only
+kernel/dropout/focal/lr/weight_decay/batch_size differ). Both runs are kept
+side by side; promoting the tuned candidate to "official" is a decision for
+after this review, not made here.
+
+| Metric        | Baseline (202440)  | Tuned candidate (trial26, 151423) | Delta   | Std change        |
+|---------------|--------------------|------------------------------------|---------|--------------------|
+| Test_F1       | 0.3664 +/- 0.1439  | 0.3865 +/- 0.2202                   | +0.0201 | GREW (0.144->0.220) |
+| Test_PR_AUC   | 0.4211 +/- 0.1081  | 0.5531 +/- 0.1573                   | +0.1320 | GREW (0.108->0.157) |
+| Test_ROC_AUC  | 0.7743 +/- 0.1261  | 0.8660 +/- 0.0734                   | +0.0917 | SHRANK (0.126->0.073) |
+
+ROC-AUC is the cleanest win (higher mean AND lower variance, the same
+signature that validated the ADR-003 inner-LOSO fix). PR-AUC improved more
+in absolute terms but got less consistent across folds. F1's mean gain is
+small and its std grew sharply -- 3 folds (S06, S07, S08) have LOW F1
+despite good-to-great ROC-AUC, meaning the val-frozen (Youden's J)
+threshold is not transferring to test as reliably under these
+hyperparameters; flagged for follow-up, not yet resolved (see §4).
+0 flagged folds (ROC-AUC<0.60), 0 NaN epochs, 0 leakage/error signatures
+across all 64 models. Wall-clock 2795.1s (~46.6 min), faster than the
+baseline's 3708s. Full table + per-fold breakdown:
+results/reports/01_baselines/baseline_tuned.txt.
+
+**Notable finding:** S08 (below-chance under the original baseline,
+0.4908) rises to Test_ROC_AUC=0.7321 under the tuned hyperparameters -- the
+single largest per-fold change in the comparison (+0.2413), moving it from
+below-chance to comfortably above 0.70, though its F1 stays low (0.0909),
+consistent with the ROC-AUC-improved/F1-inconsistent pattern above.
 
 ## 4. Current focus / next actions (in order)
-1. [ ] Fix threshold selection (validation, frozen) and re-measure the
-       post-processing gain honestly. — ADR-003
-2. [ ] Confirm n_conv_per_block in basic_tcn.py; fix the RF check formula. — ADR-005
-3. [ ] Make post-processing causal; report end-to-end latency. — ADR-004
-4. [ ] Implement nested split + grid search (kernel_size [3,5,7], dilations) with
-       the corrected RF guard. — Task C from spec
-5. [ ] Label-shift to prediction, horizon = 1 s. — ADR-006
-6. [ ] Add PR-AUC + episode-level metrics + detection latency. — ADR-007
-7. [ ] Wire external dataset (DeFOG / O'Day) as cross-dataset test. — ADR-008
+1. [x] Run the full 8-fold leak-free LOSO (run_loso.main()) and log the result
+       row in EXPERIMENTS.md as the new reference baseline. — done 2026-07-02,
+       RUN_20260702_172209, see §3.
+2. [x] Diagnose S08's below-chance AUC (data defect vs hard-but-valid). —
+       CLOSED 2026-07-02, see §3, docs/case_study_S08.md, ADR-012.
+3. [x] Rotate/inner-LOSO the val_subj choice instead of `pool[0]` for rigor
+       (was a TODO in run_loso.py). — FULLY RESOLVED 2026-07-03, ADR-003
+       (Option 1: rotate + median-select). Smoke-tested then launched full-scale.
+4. [x] Launch the full 8-fold x 50-epoch inner-LOSO run, and promote its
+       result to the new official baseline. — DONE 2026-07-02/03,
+       RUN_20260702_202440 (3708s wall-clock, launched unattended via tmux),
+       see §3. Supersedes RUN_20260702_172209 (retained on disk for
+       comparison, not deleted).
+5. [~] Implement nested split + grid search (kernel_size [3,5,7], dilations) with
+       the RF guard (basic_tcn.receptive_field). — Task C from spec, SUPERSEDED
+       by ADR-013 (Optuna TPE search, see item 10) rather than a plain grid --
+       kernel_size/dilations restricted to 4 pre-vetted RF<=64 combos (K=7
+       with any meaningfully-growing dilation set already exceeds RF=64 at
+       window=64, so "grid over [3,5,7]" as originally scoped mostly collapses
+       to K=3/K=5 anyway); TPE covers that same architecture axis plus 6 more
+       hyperparameters (dropout, focal alpha/gamma, lr, weight_decay,
+       batch_size) at once, with pruning a plain grid search can't do.
+6. [ ] Add S04/S10 False-Alarm-Rate (FAR) suite (excluded from LOSO, ADR-002).
+7. [x] Label-shift to prediction, horizon = 1 s. — ADR-006, implemented +
+       VALIDATED at full scale as ADR-014. task="prediction" added
+       additively to run_loso.main()/run_split() and
+       FoGPreprocessor.create_windows() (DETECTION path unchanged, default,
+       re-verified after every change to the shared code). 1-fold SMOKE done
+       2026-07-03 (test=S01, n_epochs=10, RUN_20260703_160327), then FULL
+       8-fold run DONE 2026-07-03 (n_epochs=50, RUN_20260703_173337,
+       3664.1s wall-clock, launched detached via tmux session "predbase") —
+       see §3 "PREDICTION BASELINE" and results/reports/01_baselines/baseline_prediction.txt.
+       Episode-level recall/lead-time established as the PRIMARY metric for
+       this task (window-level F1/PR-AUC are sparsity-limited, see §3). NOTE:
+       docs/case_study_S08.md flagged that akinetic onsets (S08-type) might
+       give even less pre-freeze lead-in signal than trembling onsets — the
+       full run shows the OPPOSITE: S08 is NOT below chance under PREDICTION
+       (unlike DETECTION), see §3.
+8. [x] Add episode-level detection rate + latency (PR-AUC/ROC-AUC/F1 now in
+       run_loso output). — ADR-007, implemented alongside ADR-014's
+       episode_level_metrics() (run_loso.py): per-onset recall + mean lead
+       time (seconds). VALIDATED at full 8-fold scale 2026-07-03: mean
+       episode_recall=0.6981±0.1606 (pooled 0.7339), mean lead time=
+       0.7154±0.0700s of the 1.00s horizon — now the PRIMARY metric for the
+       PREDICTION task (see §3, results/reports/01_baselines/baseline_prediction.txt).
+9. [ ] Wire external dataset (DeFOG / O'Day) as cross-dataset test. — ADR-008
+10. [~] Optuna hyperparameter tuning to push the DETECTION baseline. — ADR-013
+       (original ROC-AUC smoke) + ADR-018 (scaled-up PR-AUC overnight study,
+       LAUNCHED). new src/tune_optuna.py, reuses run_loso.py's run_split()/
+       inner_val_score() (not reimplemented). Search space UNCHANGED: 4
+       RF<=64 (kernel_size, dilations) combos + dropout/focal alpha/focal
+       gamma/lr/weight_decay/batch_size; TPE sampler + MedianPruner.
+       SMOKE (ADR-013, ROC-AUC objective) done 2026-07-03 (2 trials x 1 fold
+       x 5-epoch cap, results/reports/02_optuna_tuning/optuna_smoke.txt): RF guard rejects
+       the known-bad combo, objective confirmed val-only, no leakage,
+       trials persisted (sqlite + CSV). Found + fixed a real checkpoint-path
+       collision bug along the way (shared hardcoded 'best_model.pth' across
+       concurrent training runs -- see ADR-013 for detail); now every
+       run_split() call uses a unique checkpoint path.
+       [x] LAUNCHED 2026-07-04 (ADR-018): scaled-up OVERNIGHT study, two
+       substantive changes from the smoke -- (1) objective = mean val
+       PR-AUC (new inner_val_score_prauc(), NOT run_loso.py's ROC-AUC-based
+       inner_val_score(), which stays unchanged for the production
+       DETECTION pipeline/ADR-003); rationale: this project's real weakness
+       is precision under imbalance, which ROC-AUC under-weights; (2)
+       tuning_folds=[S01,S03,S08] (S08 deliberately swapped in for S02 --
+       the akinetic outlier below-chance under DETECTION, ADR-012 -- so the
+       search favors phenotype-generalizing params, not just easy
+       subjects). Scale: 40 trials (up from smoke's 2), epoch_cap=25 (up
+       from 5), MedianPruner n_startup_trials=8 (up from 5). PR-AUC SMOKE
+       gate (2 trials x S01 x 5-epoch cap) run and verified interactively
+       BEFORE launch: RF guard, val-PR-AUC objective, VAL-ONLY leakage
+       guard (0 AssertionErrors across 14 models), trial persistence all
+       CONFIRMED PASSED -- see results/reports/02_optuna_tuning/optuna_launch.txt sec 2.
+       Wall-clock: ~8.03hr conservative upper bound (smoke's 5-epoch cap
+       couldn't exercise early stopping at all, so real wall-clock should
+       be meaningfully lower). Launched detached in tmux session "optuna"
+       -> results/reports/06_run_logs/optuna_full.log, confirmed alive at launch time
+       (config matches spec exactly in the log header). Study:
+       results/optuna/study_full_prauc.db (sqlite, resumable); per-trial
+       CSV: results/optuna/trials_log_full_prauc.csv. NOT done tonight
+       (deferred as instructed): the final 50-epoch run with best params
+       (run_finalize(), already implemented) and precision-aware threshold
+       work. Full report: results/reports/02_optuna_tuning/optuna_launch.txt.
+11. [ ] Investigate the tuned DETECTION candidate's (RUN_20260705_151423)
+       F1/threshold-transfer inconsistency: 3 of 8 folds (S06, S07, S08)
+       have LOW Test_F1 despite good-to-great Test_ROC_AUC under trial26's
+       hyperparameters, while ROC-AUC/PR-AUC improved broadly. Candidate
+       directions: re-sweep the val threshold-selection rule (Youden's J)
+       under these hyperparameters specifically, or check whether
+       dropout=0.19/focal_alpha=0.75/focal_gamma=2.02 shift the probability
+       distribution's shape enough that a single frozen-threshold rule
+       transfers less reliably than under the original baseline's
+       hyperparameters. BUMPED UP (2026-07-06): still fully unresolved, and
+       now the most concrete open correctness question on the books now
+       that Jetson deployment infrastructure (item 13 below) is done. See §3
+       "TUNED DETECTION baseline CANDIDATE" and
+       results/reports/01_baselines/baseline_tuned.txt §3/§5.
+12. [ ] Investigate PREDICTION's pre-FoG positive-window sparsity (~1-4% of
+       windows, 5-15x sparser than DETECTION's ~19%) as the main limiter on
+       window-level F1/PR-AUC, and S09's specifically low episode_recall
+       (0.4074) despite near-best window-level PR-AUC/F1 -- candidate
+       directions: shorter horizon / finer step_size to yield more positive
+       windows per onset, oversampling or a recall-weighted loss for the
+       pre-FoG class, or synthetic/augmented pre-FoG examples (time-warp,
+       jitter) as a dataset-augmentation angle once the sparsity is confirmed
+       to be the binding constraint rather than a signal-quality one. See §3,
+       §5, results/reports/01_baselines/baseline_prediction.txt §3-4. Also
+       still open: the "most cue triggers not tied to known onsets"
+       precision flag from item 13's edge scaffolding work below -- same
+       underlying window-level precision weakness.
+13. [~] Deploy the PREDICTION model (RUN_20260703_173337) for closed-loop RAS
+       cueing on Jetson Orin NX. — ADR-010 (edge target) + ADR-016 (new,
+       deployment plan). Hardware-independent pipeline SCAFFOLDED 2026-07-03
+       on WSL/RTX4060, no physical sensor: new edge/ package (model_utils.py
+       shared config/loading + export_onnx.py + stream_infer.py + ras_cue.py
+       + latency_harness.py), imports READ-ONLY from src/, src/ itself
+       unmodified. Default deployment checkpoint = S01-fold of
+       RUN_20260703_173337 (best_model_S01.pth), chosen specifically so the
+       S01 replay is a genuine held-out sanity check, not a final full-data
+       model (see ADR-016 / edge/model_utils.py).
+       - [x] edge/stream_infer.py: ring-buffer streaming replay of
+             data/dataset/S01R01.txt, causal by construction, reuses
+             causal_median/causal_majority_vote from src/run_loso.py
+             unchanged. 58 cue trigger events; 13/18 onsets preceded by a
+             cue within the 1.0s horizon (sanity recall=0.7222, mean lead
+             0.6899s) vs the offline reference (episode_recall=0.7826,
+             mean_lead_time_s=0.6797 for full S01) -- same ballpark, expected
+             deltas documented (single-file replay vs both S01 files,
+             continuous-through-freeze streaming vs offline's excluded
+             freeze windows). See results/reports/04_edge_deployment/edge_scaffold.txt sec 2.
+       - [x] edge/ras_cue.py: RAS cueing stub, CueStrategy interface
+             (FixedTempoCueStrategy implemented; AdaptivePhaseShiftCueStrategy
+             a documented NotImplementedError stub for later). A real
+             window-indexed-vs-sample-indexed timestamp bug was found and
+             fixed during this session's own integration smoke test (not
+             left for tomorrow) -- see results/reports/04_edge_deployment/edge_scaffold.txt sec 3.
+       - [x] edge/export_onnx.py: UNBLOCKED 2026-07-03 -- installed
+             onnx==1.22.0 + onnxruntime==1.27.0 (added to requirements.txt,
+             not silent), ran the export: edge/artifacts/fog_tcn.onnx
+             (opset=17, fixed input [1,3,64], sigmoid baked in), validated
+             against 100 real S01 windows via onnxruntime CPU EP.
+             **PyTorch vs onnxruntime max abs diff = 1.192e-07** (<< 1e-4
+             threshold, no tolerance loosened). See
+             results/reports/04_edge_deployment/edge_scaffold_2.txt sec A.
+       - [x] edge/stream_infer.py: gained `--infer_step` (default 8, ADR-017),
+             DECOUPLED from the training stride STEP_SIZE=32 (src/ untouched;
+             64-sample causal window + model weights unchanged; only forward-
+             pass cadence changes). Sweep on the S01R01.txt replay (18
+             onsets), same causal post-proc reused unchanged from
+             src/run_loso.py:
+               infer_step=32: decision_interval=500ms, sanity_recall=0.7222
+                 (13/18), mean_lead=0.6899s, cue_triggers=58
+               infer_step=16: decision_interval=250ms, sanity_recall=0.8333
+                 (15/18), mean_lead=0.8760s, cue_triggers=82
+               infer_step=8:  decision_interval=125ms, sanity_recall=1.0000
+                 (18/18), mean_lead=0.8490s, cue_triggers=226
+             Smaller infer_step clearly improves recall/lead time on this
+             replay, but the SAME k=5/w=7 causal post-proc now spans much
+             less real time (combined worst-case span 5500ms->1375ms),
+             which is most of why cue_triggers rises so sharply -- flagged
+             as OPEN, not resolved (re-tune k/w or add a refractory period
+             in ras_cue.py before picking a final infer_step for a live
+             demo). See results/reports/04_edge_deployment/edge_scaffold_2.txt sec B/D.
+       - [x] edge/latency_harness.py: now reports forward (MEASURED,
+             ~1.2-1.7ms mean, empirically flat across infer_step -- confirms
+             per-call compute cost doesn't change with cadence) and
+             decision_interval (STRUCTURAL, 500/250/125ms per infer_step
+             setting) as two SEPARATE, clearly labeled numbers -- the
+             earlier "end_to_end" merged framing (edge_scaffold.txt part 1)
+             is superseded, see ADR-017 for why merging them was misleading.
+             Same harness reruns unchanged on Jetson tomorrow.
+       - [x] RESOLVED 2026-07-04: span-constant post-proc + refractory
+             debounce (ADR-017 extension). edge/stream_infer.py's k/w are
+             now DERIVED per infer_step (derive_kw(), target
+             median_span_ms=800/majority_span_ms=1000) so real-time
+             smoothing span stays ~constant instead of collapsing;
+             edge/ras_cue.py's RASCueEngine gained refractory_ms (default
+             2000ms). Re-swept infer_step in {32,16,8}:
+               infer_step=32: k=2,w=2, cue_triggers=122 (117 w/ refractory),
+                 sanity_recall=1.0000 (18/18), mean_lead=0.7240s
+               infer_step=16: k=3,w=4, cue_triggers=125 (112 w/ refractory),
+                 sanity_recall=1.0000 (18/18), mean_lead=0.8351s
+               infer_step=8:  k=6,w=8, cue_triggers=134 (123 w/ refractory),
+                 sanity_recall=0.9444 (17/18), mean_lead=0.8667s
+             KEY FINDING: trigger-count explosion CONFIRMED FIXED (1.10x
+             spread vs the old 3.90x). Recall does NOT keep improving with
+             smaller infer_step once span is constant (already at ceiling
+             at infer_step=32) -- most of the ORIGINAL "smaller infer_step
+             helps recall" trend was a smoothing-span dilution artifact of
+             the old fixed k=5/w=7, not a genuine cadence effect. Lead time
+             DOES show a real, modest cadence benefit (0.72s->0.84s->0.87s).
+             SEPARATE OPEN FLAG (not resolved by this change): even with
+             refractory, 112-134 triggers remain against only 18 true
+             onsets -- most are NOT clustered around known onsets, a
+             precision problem in the underlying probability stream
+             (consistent with this task's known low window-level PR-AUC,
+             0.093+/-0.058), not something cadence/span/refractory tuning
+             alone fixes. See §4 item 12 (sparsity-driven follow-up).
+             RECOMMENDATION (for approval, not auto-committed as a new
+             default): infer_step=16, k=3, w=4, refractory_ms=2000 for
+             tomorrow's Jetson demo -- matches infer_step=32's ceiling
+             recall with meaningfully better lead time; infer_step=8 does
+             not clearly outperform it. Full numbers:
+             results/reports/04_edge_deployment/edge_scaffold_3.txt.
+       Full reports: results/reports/04_edge_deployment/edge_scaffold.txt (part 1) +
+       results/reports/04_edge_deployment/edge_scaffold_2.txt (part 2) +
+       results/reports/04_edge_deployment/edge_scaffold_3.txt (part 3, this update).
+       - Jetson deployment infrastructure DONE 2026-07-05 (approved
+         infer_step=16/k=3/w=4/refractory_ms=2000 config): env verified
+         (JetPack 6.2/TRT 10.3.0/onnxruntime 1.18.0 CPU/numpy 1.21.5, no
+         torch -- ONNX/TensorRT-only deployment path), fog_tcn.onnx
+         converted to both FP32 and FP16 TensorRT engines (FP32 adopted,
+         ADR-021), numerical parity vs source ONNX confirmed (max abs diff
+         3.51e-05 << 1e-4), and the on-device latency + sanity replay
+         harness run (18/18 onsets caught, ~2.2x faster forward pass than
+         WSL/RTX4060). See §11 for the full numbers. Remaining items are
+         explicitly DEFERRED, not forgotten:
+           (a) INT8 quantization study -- needs a calibration dataset, not
+               attempted yet.
+           (b) Real IMU wiring -- hardware TBD, no physical sensor yet.
+           (c) RAS cueing hardware integration (actual audio output) --
+               deferred, ras_cue.py's FixedTempoCueStrategy is software-only
+               so far.
+         The precision flag (most triggers not tied to known onsets) also
+         remains open, see §4 item 12.
 
 ## 5. Known risks
-- S08 below chance: possible label/orientation issue for that subject, or genuine
-  hard case — needs a per-subject diagnostic plot before trusting the mean.
+- S08 below chance: CLOSED as hard-but-valid akinetic phenotype, not a data
+  defect — see §3, docs/case_study_S08.md, ADR-012. Kept in the official
+  baseline mean; no further action unless the write-up wants a deeper
+  phenotype-level study.
+- RESOLVED: the official baseline now uses inner-LOSO val_subj selection
+  (RUN_20260702_202440, §3); the old fixed `val_subj = pool[0]` run
+  (RUN_20260702_172209) is superseded and kept only for comparison.
 - "+4% F1" headline is at risk until ADR-003/004 are resolved.
 - Switching datasets mid-project is a timeline risk — current plan keeps Daphnet
   primary (ADR-008).
+- RESOLVED (found 2026-07-03 during Optuna smoke): run_split()/trainer_tcn.py
+  used to save every training checkpoint to a single hardcoded 'best_model.pth'
+  in the repo CWD. Fine as long as only one training ran at a time with a
+  fixed architecture, but unsafe the moment two things vary: (a) architecture
+  changes between calls (Optuna), or (b) two training processes run
+  concurrently against the same repo (this actually happened — a second
+  session was mid-run on the PREDICTION task at the same time). Fixed: every
+  run_split() call now gets its own unique checkpoint path
+  (results/_tmp_checkpoints/). No longer a risk for future concurrent runs
+  from either task.
+- PREDICTION's pre-FoG positive-window sparsity (~1-4% of windows, vs
+  DETECTION's ~19%) is the MAIN LIMITER on window-level F1/PR-AUC for that
+  task — intrinsic to horizon=window_size=64 + step_size=32 (each onset
+  yields at most ~2 positive windows by construction), not a labeling
+  defect (ADR-014). Episode-level recall/lead-time route around it as the
+  primary metric, but the sparsity itself is unaddressed — flagged as §4
+  item 11 for a future pass (shorter horizon/finer stride, class-weighted
+  loss, or dataset augmentation of pre-FoG examples).
+- S09 has a low PREDICTION episode_recall (0.4074, the weakest of 8 folds)
+  despite near-best window-level PR-AUC/F1 for that same fold — a specific
+  missed-onset pattern (likely short/fast-onset episodes specifically, not
+  yet confirmed) rather than a general signal failure. Flagged as §4 item 11
+  for follow-up; not yet diagnosed the way S08 was (docs/case_study_S08.md).
 
 ## 6. Repo structure — FINALIZED (restructured 2026-06-14)
 ```
 115Daphnet_FoG/
 ├── data/                  Daphnet raw SxxRyy files (untouched)
 ├── results/               RUN_<timestamp>/ outputs (loso_summary, curves, ...) (untouched)
+│   └── reports/            human-facing summary .txt (baseline_summary, wsl_smoke, ...) — new 2026-07-02
 ├── src/
 │   ├── basic_tcn.py       TCN architecture          <- need n_conv_per_block
 │   ├── fog_preprocessing.py  windowing/labeling     <- need stride/overlap/label map
@@ -80,9 +389,23 @@ Caveats (do not quote these numbers in a paper as-is):
 ├── README.md               (new, empty template)
 ├── requirements.txt        frozen from fog_env_64 (active venv)
 ├── CLAUDE.md              agent memory (this set)
-├── fog_env/, fog_env_64/  venvs (ignore)
+├── fog_env/, fog_env_64/  Windows venvs (ignore, kept intact)
+├── fog_env_wsl/            WSL-native venv, torch 2.5.1+cu121, GPU-verified (ignore) — new 2026-07-02
 └── tree.txt
 ```
+
+**WSL-native training env (2026-07-02):** `fog_env_wsl` (`python3 -m venv`, WSL Ubuntu)
+added additively alongside `fog_env_64` (not a replacement) so CLI + training run in one
+shell — see DECISIONS.md ADR (env reproducibility) for the exact install command.
+`torch.cuda.is_available()` == True, device = RTX 4060. `~/.bashrc` now exports
+`PYTHONUTF8=1` / `PYTHONIOENCODING=utf-8` to avoid the prior multi-shell encoding issues.
+Smoke test (1 fold, test=S01, val=S02, n_epochs=2) ran on `cuda`, RF=57<=64, threshold
+picked on val — see `results/reports/05_smoke_tests/wsl_smoke.txt`.
+
+**results/ convention (2026-07-02):** per-run training outputs (loso_summary,
+loso_detailed_predictions, curves/) live in `results/RUN_<timestamp>/`, written there
+automatically by `run_loso.py` (path logic unchanged). Hand-written / uploaded summary
+`.txt` files live in `results/reports/` instead of loose at `results/` top level.
 
 **What moved (2026-06-14 restructure):**
 - `model/` -> `src/` (basic_tcn.py, fog_preprocessing.py, trainer_tcn.py unchanged; flat
@@ -130,3 +453,115 @@ engineering standards).
       export TensorRT, lit-review via nrp-literature MCP).
 - [ ] Populate tests/ per R9 (subject-overlap, RF<=window, label-mapping, causal
       post-proc checks).
+
+## 9. Edge deployment platform (Jetson) — 2026-07-04
+Platform consolidated ahead of on-device work (ONNX->TensorRT conversion,
+real IMU wiring, on-device latency per ADR-016/017). See ADR-019 for why
+this specific hardware/access setup was chosen.
+
+**Hardware:** Yahboom Jetson Orin NX SUPER Developer Kit. Root storage
+expanded from the stock 27GB eMMC/SD to a 476GB SPCC NVMe SSD (467GB
+usable) -- needed headroom for CUDA/TensorRT/JetPack toolchain + model
+artifacts + logs. Power: 19V DC barrel jack is MANDATORY (the module does
+not reliably boot/run on USB-C or underrated supplies). Video out: DP
+(DisplayPort).
+
+**OS / JetPack:** L4T R36.4.7 (JetPack 6.2), Ubuntu 22.04, CUDA 12.6,
+Python 3.10.12. JetPack 6.x's TensorRT (10.x) supports ONNX opset 17 --
+matches edge/export_onnx.py's exported opset exactly (ADR-016), so
+edge/artifacts/fog_tcn.onnx should convert without an opset-downgrade step.
+
+**Access:** SSH over Tailscale (zero-config, no campus VPN dependency) --
+Jetson tailnet address 100.97.43.118, tailnet candy070405@. Sudo user on
+the device: "stu". Wired ethernet fallback: 140.116.132.43 (NCKU campus
+network, only reachable on-campus). Tailscale is the primary/default path
+since it works identically regardless of which network either end is on.
+
+**Workspace:** ~/fog_edge/{artifacts,scripts,logs,models} on the Jetson --
+a clean, separate workspace from the device's previous user's ~/jps/
+directory, which is explicitly NOT to be touched (not ours, unrelated
+prior work).
+
+**Location & continuity:** the Jetson physically stays at NCKU; all
+on-device work continues remotely via Tailscale SSH from Kaohsiung -- the
+setup does not require physical presence at the device for day-to-day
+development, only for the initial hardware/storage/power setup already
+done and for anything requiring physical access (re-flashing, hardware
+faults, peripheral changes).
+
+**Known issue (no functional impact confirmed):** Tailscale logs an
+iptables-legacy connmark warning on this device. A system restart is
+pending to clear it; SSH and basic connectivity have been confirmed
+working despite the warning, so this is not currently blocking any work --
+flagged here so it isn't mistaken for a new problem if it resurfaces after
+the pending restart.
+
+## 10. reports/ layout (topic-organized as of 2026-07-05)
+`results/reports/` was reorganized from a flat ~26-file directory into
+topic subfolders. Full reorg record (mapping, diffs, before/after
+reference counts, one data-loss disclosure): results/reports/99_misc/reorg_report.txt.
+
+- `01_baselines/` -- DETECTION/PREDICTION baseline summary reports
+  (baseline_*.txt, full_loso_report.txt).
+- `02_optuna_tuning/` -- Optuna study reports (optuna_launch.txt,
+  optuna_summary.txt, optuna_smoke.txt).
+- `03_case_studies/` -- per-subject diagnostic deep-dives (diag_S08_report.txt
+  + its diag_S08/ figure folder).
+- `04_edge_deployment/` -- edge/Jetson deployment reports (edge_scaffold*.txt,
+  jetson_*.txt).
+- `05_smoke_tests/` -- 1-fold/quick smoke-test reports (wsl_smoke.txt,
+  innerloso_smoke.txt, prediction_smoke.txt).
+- `06_run_logs/` -- raw console logs from detached tmux training runs
+  (*.log) -- git-ignored (results/reports/06_run_logs/*.log), kept locally
+  only; the human-facing summary .txt for each run lives in the matching
+  topic subfolder above instead.
+- `99_misc/` -- ungrouped/meta reports (e.g. this reorg's own record).
+
+**Rule for new reports:** put each new report in the subfolder matching its
+topic above; raw run logs (`*.log`) go in `06_run_logs/` (git-ignored) --
+NOT at `results/reports/` root and NOT alongside the `.txt` summary they
+back. Launcher scripts (`scripts/launch_*.sh`) already write their `*.log`
+redirect targets into `06_run_logs/` directly.
+
+## 11. Jetson deployment measured performance (2026-07-05)
+Deployment target: Jetson Orin NX SUPER (JetPack 6.2). Full per-task
+reports: `results/reports/04_edge_deployment/jetson_env.txt` (env verify),
+`jetson_scp.txt` (artifact transfer), `jetson_trt_build.txt` (engine
+build), `jetson_verify_engine.txt` (numerical parity), `jetson_latency.txt`
+(on-device latency + sanity replay).
+
+**Environment:** JetPack 6.2, TensorRT 10.3.0, ONNX Runtime 1.18.0 (CPU
+execution provider), NumPy 1.21.5. No PyTorch on this Jetson by design --
+the deployment path is ONNX/TensorRT-only (saves the Jetson-specific torch
+wheel install entirely; see ADR-021 for why this is sufficient).
+
+**Deployment target: `fog_tcn_fp32.engine`.** Both FP32 and FP16 TensorRT
+engines were built from `fog_tcn.onnx`; FP16 was NOT adopted -- it shows no
+speedup on this model size (Task 3 / `jetson_trt_build.txt`: FP16 GPU
+Compute time is statistically indistinguishable from FP32's, this model is
+too small/launch-bound for FP16 to help). See ADR-021.
+
+**Latency** (from `jetson_latency.txt`, primary deployment config
+infer_step=16/k=3/w=4):
+
+| metric | value |
+|---|---|
+| TRT forward, median | 0.6292 ms (P95 0.6415 ms) |
+| Post-proc, median | 1.1921 ms (pandas call overhead dominates the tiny forward pass) |
+| End-to-end compute, median | 1.8233 ms |
+| Decision interval (structural) | 250 ms (= infer_step/fs_hz, NOT measured -- see jetson_latency.txt) |
+| Compute as % of decision interval | ~0.73% |
+
+**Sanity replay:** 18/18 known onsets in the S01R01.txt replay preceded by
+>=1 cue within the 1.0s horizon (sanity_recall=1.0000); mean lead time
+0.8906s, within 6.6% of the WSL/edge_scaffold_3.txt reference (0.8351s for
+the same k/w/infer_step config) -- attributed to a scaler-fit difference
+between the two harnesses (documented in `jetson_latency.txt`), not a
+pipeline defect.
+
+**Numerical parity vs source ONNX (Task 4):** TRT FP32 max abs diff =
+3.51e-05, comfortably under the 1e-4 threshold (no tolerance loosened).
+
+**Speedup vs WSL/RTX4060:** ~2.2x faster forward pass than the WSL PyTorch-
+GPU baseline (1.4006 ms median, `edge_scaffold_2.txt`), and ~1.9x faster
+than the WSL CPU baseline (1.2037 ms median).

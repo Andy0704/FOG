@@ -1,0 +1,43 @@
+/mnt/c/Project/115Daphnet_FoG/src/run_loso.py:45: SyntaxWarning: invalid escape sequence '\s'
+  df = pd.read_csv(file_path, sep='\s+', header=None)
+[SEED] 42
+[TASK] DETECTION (label at t, horizon=n/a)
+[DEVICE] cuda
+實驗資料夾已建立: /mnt/c/Project/115Daphnet_FoG/results/RUN_20260702_155917
+找到 10 位受試者: ['S01', 'S02', 'S03', 'S04', 'S05', 'S06', 'S07', 'S08', 'S09', 'S10']
+FoG 受試者 (LOSO 迴圈): ['S01', 'S02', 'S03', 'S05', 'S06', 'S07', 'S08', 'S09']
+本次僅執行 (test_subj): ['S01']
+
+==============================
+開始執行 LOSO Fold: 測試受試者為 【S01】
+==============================
+Train subjects: ['S03', 'S05', 'S06', 'S07', 'S08', 'S09']
+Val subject:    S02
+Test subject:   S01
+[RF] 57 (<= 64)
+ 開始訓練 (Train: 20419 窗, Val: 2829 窗, Test: 3799 窗)...
+開始訓練，使用裝置: cuda
+DEBUG -> TP: 174, FP: 251, TN: 2167, FN: 237
+Epoch 1/2 | Train Loss: 0.1014 | Val Loss: 0.0645 | F1: 0.4163 | FPR: 0.1038
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 187, FP: 181, TN: 2237, FN: 224
+Epoch 2/2 | Train Loss: 0.0889 | Val Loss: 0.0597 | F1: 0.4801 | FPR: 0.0749
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+已載入 S01 折的最佳模型 (val_subj=S02) 進行評估
+【S01】 (val=S02) 凍結 Threshold: 0.3617
+【S01】 Test_F1: 0.1882, Test_PR_AUC: 0.1526, Test_ROC_AUC: 0.7267
+ 已儲存 ROC 圖: /mnt/c/Project/115Daphnet_FoG/results/RUN_20260702_155917/curves/roc_S01.png
+
+============================================================
+ LOSO 交叉驗證最終總結報告
+============================================================
+
+ LOSO 總結報告已儲存: /mnt/c/Project/115Daphnet_FoG/results/RUN_20260702_155917/loso_summary_20260702_155917.csv
+
+ 整體平均表現 (frozen-threshold, TEST subject only):
+ Mean Test_F1:      0.1882 ± nan
+ Mean Test_PR_AUC:  0.1526 ± nan
+ Mean Test_ROC_AUC: 0.7267 ± nan
+詳細預測機率已存至: /mnt/c/Project/115Daphnet_FoG/results/RUN_20260702_155917/loso_detailed_predictions_20260702_155917.csv

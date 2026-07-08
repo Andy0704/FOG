@@ -1,0 +1,130 @@
+Optuna hyperparameter tuning -- SMOKE TEST (ADR-013)
+======================================================================
+task        : DETECTION (label at t, horizon=n/a)
+protocol    : Optuna tuning ON TOP OF the existing leak-free inner-LOSO
+              protocol (ADR-003). Objective = mean of the per-outer-fold
+              MEDIAN inner-LOSO validation ROC-AUC (same median-rule metric
+              run_loso.py already computes). Reuses run_split() and
+              inner_val_score() from run_loso.py -- not reimplemented.
+smoke config: 2 trials x 1 outer fold (test=S01) x 5-epoch cap, seed=42
+device      : cuda (NVIDIA GeForce RTX 4060, fog_env_wsl, torch 2.5.1+cu121)
+sampler     : TPE (optuna.samplers.TPESampler, seed=42)
+pruner      : MedianPruner (n_startup_trials=5, n_warmup_steps=1) -- did not
+              trigger in this smoke (needs >=5 trials before it has a median
+              to compare against; expected, not a defect)
+
+NOTE ON THIS RUN: the first smoke attempt crashed on Trial 0 with a
+PyTorch state_dict shape-mismatch RuntimeError. Root cause: run_split() (and
+trainer_tcn.py) saved every training run's checkpoint to a single hardcoded
+'best_model.pth' in the repo's CWD. A second, independent Claude Code session
+was concurrently running its own training job (PREDICTION-task work, ADR-014)
+against the SAME repo at the SAME time, and both processes were writing to
+that same shared filename. Because this smoke varies model architecture
+(kernel_size/dilations) between calls, the collision surfaced immediately as
+a tensor-shape mismatch instead of silently corrupting a checkpoint. Fixed by
+giving every run_split() call its own unique checkpoint path
+(results/_tmp_checkpoints/ckpt_<pid>_<uuid>.pth, cleaned up by the caller
+after use) in src/trainer_tcn.py + src/run_loso.py. This also protects any
+future concurrent training runs from either session, not just Optuna's. The
+smoke below is the RE-RUN, after the fix, which completed cleanly.
+
+----------------------------------------------------------------------
+1. RF GUARD VALIDATION
+----------------------------------------------------------------------
+  ARCH OK: kernel_size=3 dilations=[1, 2, 4]  RF=29 (<= 64)
+  ARCH OK: kernel_size=3 dilations=[1, 4, 8]  RF=53 (<= 64)
+  ARCH OK: kernel_size=3 dilations=[1, 2, 8]  RF=45 (<= 64)
+  ARCH OK: kernel_size=5 dilations=[1, 2, 4]  RF=57 (<= 64)
+  REJECTED (expected): kernel_size=5 dilations=[1, 4, 8]  RF=105 (> 64)
+    -- BasicTCN raised ValueError as designed. The Optuna search space itself
+    can never generate an invalid combo (Optuna picks an INDEX into the 4
+    pre-vetted combos above, not free kernel_size/dilations values), so this
+    is a defensive double-check, not something the search space could trigger.
+
+----------------------------------------------------------------------
+2. OBJECTIVE IS VAL-ONLY (test subject never touched)
+----------------------------------------------------------------------
+Tuning outer-fold subset this smoke: ['S01'] (test_subj -- EXCLUDED from all
+training/val calls). Per-trial-per-fold log (results/optuna/trials_log_smoke.csv):
+
+trial_number | step | test_subj_excluded | selected_val_subj | fold_median_val_rocauc
+0            | 0    | S01                | S07                | 0.8970
+1            | 0    | S01                | S07                | 0.8402
+
+S01 (the test subject) appears ONLY in the "excluded" column, never as a
+train subject or as selected_val_subj, in either trial. build_xy() /
+build_prediction_records() are never called with S01 anywhere in the
+objective function -- confirmed by code inspection (tune_optuna.py's
+make_objective() only ever calls run_split() with inner_train_subjs and a
+candidate drawn from pool = fog_subjects minus test_subj).
+
+----------------------------------------------------------------------
+3. LEAKAGE ASSERTIONS
+----------------------------------------------------------------------
+Both the inner-candidate assertion (test_subj not in inner_train_subjs and
+candidate != test_subj) and run_split()'s own internal assertions (test_subj
+not in train_subjs; val_subj not in train_subjs and val_subj != test_subj)
+fired zero times across all 14 models trained (2 trials x 7 inner candidates)
+-- i.e. no AssertionError anywhere in the run log. No leakage.
+
+----------------------------------------------------------------------
+4. TRIAL PERSISTENCE
+----------------------------------------------------------------------
+  results/optuna/study_smoke.db        (sqlite, optuna.create_study storage)
+  results/optuna/trials_log_smoke.csv  (per-trial-per-fold CSV, crash-safe
+                                         incremental append, same pattern as
+                                         run_loso.py's append_result_row())
+Verified by reloading the study from disk after the run:
+  trial 0: state=COMPLETE value=0.8970336606332561
+  trial 1: state=COMPLETE value=0.8401939220530403
+(matches the in-memory results exactly)
+
+Checkpoint hygiene: results/_tmp_checkpoints/ is empty after the run (every
+per-call checkpoint was removed by its caller once used); no stray
+'best_model.pth' left in the repo root.
+
+----------------------------------------------------------------------
+5. SMOKE RESULT
+----------------------------------------------------------------------
+Trial 0: value=0.8970 (arch_idx=1: K=3 dilations=[1,4,8]; dropout=0.1468;
+  focal_alpha=0.5624; focal_gamma=1.1162; lr=0.001903; weight_decay=0.000601;
+  batch_size=128)
+Trial 1: value=0.8402 (arch_idx=0: K=3 dilations=[1,2,4]; dropout=0.1550;
+  focal_alpha=0.6217; focal_gamma=2.0495; lr=0.000435; weight_decay=0.000291;
+  batch_size=128)
+Best value (val-only mean inner ROC-AUC): 0.8970 (trial 0)
+
+Total smoke wall-clock: 109.4s (14 models trained, avg 1.34s/epoch -- faster
+per-epoch than earlier full-scale runs (~3.3s/epoch) most likely due to the
+smaller K=3 architectures dominating this smoke and/or reduced GPU contention
+after the concurrent-session collision was resolved).
+
+----------------------------------------------------------------------
+6. WALL-CLOCK PROJECTION FOR THE FULL 30-TRIAL STUDY
+----------------------------------------------------------------------
+Stated default full-study config: n_trials=30, epoch_cap=25,
+tuning_folds=3 outer folds (S01, S02, S03), 7 inner candidates/fold
+(no final retrain during tuning -- objective only needs val scores).
+
+  Projected FULL STUDY (30 trials x 3 folds x 7 inner candidates x 25 epochs,
+  UPPER BOUND, no pruning benefit, no early stopping):
+    21052s  (~350.9 min, ~5.85 hr)
+
+This is a conservative upper bound: it assumes every trial trains every fold
+to the full 25-epoch cap. In practice patience=5 early stopping AND the
+MedianPruner (which can abort a clearly-bad trial after fold 1 of 3, once
+>=5 trials have completed and a real median exists to compare against) will
+both cut real wall-clock below this number, likely substantially.
+
+For reference, a lighter alternative (not a recommendation, just cost
+context given how large the upper bound is): 15 trials x 1 outer fold x
+25 epochs -> upper bound 3509s (~58.5 min, ~0.97 hr).
+
+----------------------------------------------------------------------
+DECISION NEEDED FROM YOU
+----------------------------------------------------------------------
+The full 30-trial study (stated default config) has NOT been launched. Given
+the ~5.85 hr upper-bound estimate, please confirm:
+  (a) proceed with n_trials=30, epoch_cap=25, tuning_folds=3 as specified, or
+  (b) reduce scope (e.g. fewer trials, 1 tuning fold, lower epoch cap) first.
+No further training will be launched until you approve.

@@ -1,0 +1,175 @@
+FoG TCN -- PREDICTION baseline, full 8-fold inner-LOSO (EPISODE-LEVEL PRIMARY)
+======================================================================
+run_id     : RUN_20260703_173337
+date       : 2026-07-03
+task       : PREDICTION (label shifted +H before onset, horizon=64 samples
+             = 1.00s @ 64Hz). Positive class = windows whose END-POINT
+             sample falls within the horizon before a FoG onset; during-
+             freeze samples (onset included) are excluded from train/val/
+             test windows entirely, never given a positive/negative label.
+             Full definition: DECISIONS.md ADR-014.
+protocol   : inner-LOSO val_subj selection REUSED UNCHANGED from the
+             DETECTION baseline (ADR-003 Option 1) -- for each outer fold,
+             all 7 remaining subjects rotated as an inner val candidate,
+             scored by ROC-AUC on causal-median(k=5)-smoothed val probs
+             (this time computed on PREDICTION-task labels), MEDIAN scorer
+             selected as val_subj; model retrained once on the 6 remaining
+             train subjects + selected val_subj; threshold frozen on that
+             val_subj (S2), applied to test_subj; causal post-proc K=5/W=7
+             (S4). Only the label construction differs from DETECTION
+             (fog_preprocessing.make_prediction_labels, ADR-014) -- this run
+             is a straight execution of the already-validated pipeline, no
+             code changes.
+n_epochs   : 50 (patience=5 early stopping)
+seed       : 42
+device     : cuda (NVIDIA GeForce RTX 4060, fog_env_wsl, torch 2.5.1+cu121)
+wall-clock : 3664.1s (~61.1 min, ~1.02 hr) for all 64 models trained
+             (8 outer folds x (7 inner candidates + 1 final retrain)) --
+             well under the ~2.55 hr worst-case (no-early-stopping)
+             projection from the smoke test; patience=5 triggered on most
+             splits in practice.
+source csv : results/RUN_20260703_173337/loso_summary_20260703_173337.csv
+leakage    : CONFIRMED PASSED on every split. grep for "LEAKAGE" /
+             "Traceback" / "AssertionError" / "CUDA out of memory" /
+             "Killed" across the full run log (results/reports/
+             prediction_full.log) returns ZERO matches -- no leakage
+             assertion fired at the inner-candidate level or the outer
+             train/val/test level, in any of the 8 outer folds.
+
+----------------------------------------------------------------------
+1. PER-FOLD TABLE (EPISODE-LEVEL METRICS, PRIMARY)
+----------------------------------------------------------------------
+Subject | Val_Subject | n_pos | Test_ROC_AUC | episode_recall | mean_lead_time_s
+S01     | S02         | 46    | 0.7430       | 0.7826         | 0.6797
+S02     | S09         | 45    | 0.7843       | 0.5652         | 0.6178
+S03     | S02         | 91    | 0.8982       | 0.8125         | 0.6627
+S05     | S01         | 126   | 0.7528       | 0.8281         | 0.7435
+S06     | S09         | 20    | 0.7031       | 0.6000         | 0.7109
+S07     | S01         | 48    | 0.6100       | 0.8750         | 0.7842
+S08     | S06         | 28    | 0.6659       | 0.7143         | 0.8359
+S09     | S02         | 54    | 0.7660       | 0.4074         | 0.6889
+----------------------------------------------------------------------
+
+Supporting detail (n_episodes = total onsets evaluated in that TEST subject,
+n_hits = onsets with >=1 correct imminent-onset prediction, skipped = onsets
+with zero valid pre-FoG window so excluded from recall/lead-time -- none
+occurred this run):
+Subject | n_episodes | n_hits | skipped_no_window
+S01     | 23         | 18     | 0
+S02     | 23         | 13     | 0
+S03     | 48         | 39     | 0
+S05     | 64         | 53     | 0
+S06     | 10         | 6      | 0
+S07     | 24         | 21     | 0
+S08     | 14         | 10     | 0
+S09     | 27         | 11     | 0
+TOTAL   | 233        | 171    | 0
+
+----------------------------------------------------------------------
+2. MEAN +/- STD OVER 8 FOLDS
+----------------------------------------------------------------------
+PRIMARY (episode-level):
+  episode_recall     : 0.6981 +/- 0.1606   (unweighted mean of the 8 per-fold
+                        recalls above; pooled/weighted rate = 171/233 =
+                        0.7339 -- close to the unweighted mean, so no single
+                        large-episode-count fold is distorting the average)
+  mean_lead_time_s   : 0.7154 +/- 0.0700 s (of a 1.00s horizon -- roughly
+                        70-72% of the available lead time is being used,
+                        consistently across folds)
+  Test_ROC_AUC       : 0.7404 +/- 0.0858
+
+SECONDARY (window-level, SPARSITY-LIMITED -- see section 3):
+  Test_F1            : 0.0939 +/- 0.0636
+  Test_PR_AUC        : 0.0934 +/- 0.0580
+
+n_pos (positive pre-FoG window count per TEST subject, diagnostic):
+  mean = 57.25 +/- 34.81 (range 20-126) -- see section 4 for the sparsity
+  discussion; std is large relative to the mean because episode COUNT
+  differs a lot per subject (S05 has 64 onsets vs S06's 10), not because of
+  a labeling inconsistency.
+
+----------------------------------------------------------------------
+3. EPISODE-LEVEL vs WINDOW-LEVEL -- WHY THEY DISAGREE
+----------------------------------------------------------------------
+Window-level Test_F1 (0.0939 +/- 0.0636) and Test_PR_AUC (0.0934 +/- 0.0580)
+look poor in isolation, but they are measuring the wrong thing for a RAS
+cueing use case. Pre-FoG positive windows are only ~1-4% of all windows in
+every fold (n_pos/total ranges from 0.54% (S06) to 4.06% (S05) -- see
+results/reports/prediction_smoke.txt section 2 for the full per-candidate
+breakdown), versus DETECTION's ~19% positive rate (Daphnet's native 81/19
+split, S6). This 5-15x sparsification is an INTRINSIC consequence of the
+task definition (horizon=window_size=64, step_size=32 -> each onset
+contributes at most ~2 positive-labeled windows by construction), not a
+preprocessing defect -- confirmed correct in ADR-014 and the smoke test.
+Sample-wise F1/PR-AUC are known to collapse under this level of imbalance
+even when the underlying detector is doing something useful minute-to-minute
+(CLAUDE.md S6: "Sample-wise F1 alone is not clinically meaningful").
+
+For a closed-loop RAS cueing system, what matters is NOT "does every single
+64-sample window score correctly" but "does the system fire at least once,
+with enough lead time to cue, before the freeze happens." That is exactly
+what episode_recall and mean_lead_time_s measure. By that standard, the
+PREDICTION model is meaningfully informative: 69.8% of onsets (unweighted
+mean across folds; 73.4% pooled) get caught with an average 0.72s of lead
+time out of the 1.00s horizon -- i.e., when it fires, it tends to fire early
+in the horizon, not right at the edge of onset. Test_ROC_AUC (rank-based,
+not threshold-dependent) stays much healthier than F1/PR-AUC for the same
+reason (mean 0.7404, comparable in absolute terms to several DETECTION
+folds) -- ROC-AUC does not collapse the same way under class imbalance that
+F1/PR-AUC do.
+
+Treat window-level F1/PR-AUC in this report as SPARSITY-LIMITED, secondary
+diagnostics -- not the headline for judging whether PREDICTION is viable.
+
+----------------------------------------------------------------------
+4. FLAGGED FOLDS
+----------------------------------------------------------------------
+n_pos < 20        : NONE strictly (minimum is S06 at n_pos=20, exactly at
+                     the threshold, not below it). S06 is nonetheless the
+                     sparsest fold (0.54% positive rate, only 10 onsets in
+                     the TEST subject) and its numbers (episode_recall=0.60,
+                     smallest n_episodes of all 8 folds) should be read with
+                     that small sample size in mind.
+episode_recall<0.5 : S09 FLAGGED -- episode_recall=0.4074 (11/27 onsets
+                     caught), the weakest fold on this primary metric. Its
+                     window-level Test_PR_AUC (0.1793) and Test_F1 (0.1210)
+                     were actually the best or near-best of all 8 folds,
+                     so this is specifically an episode-recall weakness
+                     (missing entire onsets), not a general signal failure
+                     for S09 -- worth a closer look in future work (e.g. is
+                     S09 missing short/fast-onset episodes specifically).
+NaN                 : NONE -- all 8 folds had >=1 class in both val and
+                     test, Episode_N>0 in every fold, skipped_no_window=0
+                     in every fold (every onset had at least one valid
+                     pre-FoG window to evaluate against).
+
+----------------------------------------------------------------------
+5. S08 (AKINETIC PHENOTYPE) UNDER PREDICTION
+----------------------------------------------------------------------
+S08 -- the akinetic (quiet) freezer that was BELOW CHANCE under DETECTION
+(Test_ROC_AUC=0.4908, docs/case_study_S08.md, ADR-012) -- is NOT below
+chance under PREDICTION (Test_ROC_AUC=0.6659, episode_recall=0.7143,
+mean_lead_time_s=0.8359s, the LONGEST average lead time of any fold): the
+pre-onset window apparently carries a distinguishable kinematic signature
+for this subject even though the DETECTION model's "high-variance -> FoG"
+heuristic fails to generalize to S08's quiet in-freeze signal -- consistent
+with the two tasks picking up genuinely different parts of the movement
+signal (pre-onset preparation vs. during-freeze tremor/akinesia).
+
+----------------------------------------------------------------------
+6. BOTTOM LINE
+----------------------------------------------------------------------
+- Leakage guard passed on all 64 models trained across all 8 outer folds
+  (0 assertion failures, checked at inner-candidate and outer level).
+- Episode-level recall (0.6981 +/- 0.1606 unweighted, 0.7339 pooled) with
+  mean lead time 0.7154 +/- 0.0700s (of 1.00s horizon) is the metric that
+  should be reported/cited for RAS-cueing viability -- window-level F1/
+  PR-AUC are real but sparsity-limited artifacts of the ~1-4% positive rate
+  and should not be presented as the headline.
+- 1 fold flagged for low episode recall (S09, 0.4074); 0 folds flagged for
+  n_pos<20 (S06 borderline at exactly 20); 0 NaN folds.
+- S08 (akinetic phenotype, below-chance under DETECTION) performs
+  comparably to the other 7 folds under PREDICTION -- notable finding for
+  the write-up, see section 5.
+- Full 8-fold run complete; results/RUN_20260703_173337/ holds the per-run
+  CSV, detailed predictions, loss curves, and ROC curves for all 8 folds.

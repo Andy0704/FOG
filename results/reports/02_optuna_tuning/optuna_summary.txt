@@ -1,0 +1,240 @@
+Optuna DETECTION hyperparameter study -- NaN AUDIT + SUMMARY (ADR-018)
+======================================================================
+date       : 2026-07-04
+task       : DETECTION (tuning study for RUN_20260702_202440's architecture/
+             hyperparameters). NOT the PREDICTION task.
+study      : results/optuna/study_full_prauc.db (sqlite)
+per-trial log : results/optuna/trials_log_full_prauc.csv
+source log : results/reports/optuna_full.log (45,878 lines)
+confirmed  : READ-ONLY analysis. No training run, no new src/ or data/
+             changes. This report only reads existing log/CSV/sqlite files.
+
+----------------------------------------------------------------------
+0. STUDY CONFIG RECAP
+----------------------------------------------------------------------
+objective       : mean of 3 outer-fold median-rule inner-LOSO val PR-AUC
+                  (causal-median(k=5)-smoothed probs, average_precision_score)
+tuning_folds    : [S01, S03, S08]  (S08 = akinetic outlier, deliberately included)
+n_trials        : 40 (TPE sampler, seed=42)
+pruner          : MedianPruner(n_startup_trials=8, n_warmup_steps=1)
+epoch_cap       : 25 (patience=5 early stopping)
+wall_clock      : 20,953.5s (~5.82 hr) -- came in well under the ~8.03hr
+                  conservative upper-bound estimate from the smoke, as
+                  expected once early stopping had room to trigger at the
+                  25-epoch cap.
+search space    : UNCHANGED from ADR-013 -- 4 RF<=64 arch combos (K3/[1,2,4],
+                  K3/[1,4,8], K3/[1,2,8], K5/[1,2,4]), dropout 0.1-0.4,
+                  focal_alpha 0.5-0.9, focal_gamma 1.0-3.0, lr 1e-4..3e-3
+                  (log scale), weight_decay 0..1e-3, batch_size {128,256}.
+
+Trial state counts: COMPLETE=37, PRUNED=3 (trials 20, 30, 38), FAILED=0.
+(No Python traceback/exception anywhere in the 45,878-line log -- the
+study never crashed, consistent with the NaN-audit finding below that no
+trial's checkpoint-reload safety net ever failed outright.)
+
+----------------------------------------------------------------------
+1. NaN AUDIT (done FIRST, as instructed)
+----------------------------------------------------------------------
+Method: every "[RF]" print line in the log marks the start of one fresh
+model's training (one inner-LOSO candidate); trial boundaries come from
+Optuna's own "Trial N finished"/"Trial N pruned" lines (BOTH kinds were
+needed -- an earlier pass that only tracked "finished" lines mis-attributed
+content from pruned trials 20/30/38 into the following trial; this was
+caught and fixed by including "pruned" as a boundary too). Sanity check:
+total "[RF]" lines in the file (826) exactly equals the sum of per-trial
+model counts after fixing the boundaries -- the attribution is internally
+consistent.
+
+RESULT: 16 of 40 trials (40%) had >=1 candidate whose training produced a
+"Train Loss: nan | Val Loss: nan" epoch somewhere in its 25-epoch run.
+Full per-trial breakdown (trial# : fold=candidate : first NaN epoch):
+
+Trial  0 (COMPLETE, value=0.6086): S01=S05@12, S01=S09@13, S03=S01@10, S03=S06@13, S03=S09@11, S08=S01@9, S08=S02@8, S08=S09@10
+Trial  4 (COMPLETE, value=0.6146): S01=S07@16, S01=S09@16, S03=S02@16, S08=S06@17, S08=S07@14, S08=S09@15
+Trial  6 (COMPLETE, value=0.6047): S08=S06@24
+Trial 11 (COMPLETE, value=0.5959): S01=S09@12, S03=S01@11, S03=S02@11, S03=S06@11, S03=S07@11, S03=S09@13, S08=S01@11, S08=S02@9, S08=S05@10, S08=S06@11, S08=S07@9
+Trial 13 (COMPLETE, value=0.5885): S01=S03@11, S01=S05@11, S01=S06@10, S01=S07@9, S01=S09@12, S03=S01@9, S03=S05@10, S03=S07@10, S03=S08@10, S08=S01@10, S08=S02@10, S08=S06@8, S08=S07@8, S08=S09@10
+Trial 14 (COMPLETE, value=0.6017): S03=S05@19
+Trial 15 (COMPLETE, value=0.6018): S01=S02@14, S03=S01@13, S03=S02@12, S03=S06@12, S08=S07@13
+Trial 17 (COMPLETE, value=0.6138): S01=S07@15, S03=S01@21, S03=S07@17, S08=S06@17, S08=S07@14
+Trial 21 (COMPLETE, value=0.5897): S01=S02@11, S01=S05@12, S01=S07@10, S01=S08@12, S01=S09@11, S03=S05@11, S03=S06@13, S03=S07@12, S03=S09@13, S08=S02@13, S08=S05@10, S08=S06@9, S08=S07@11, S08=S09@11
+Trial 22 (COMPLETE, value=0.6202): S03=S06@20, S03=S07@20, S03=S08@15, S08=S07@17
+Trial 23 (COMPLETE, value=0.6248): S01=S03@16, S01=S07@15, S01=S09@19, S03=S06@17, S03=S09@18, S08=S07@18
+Trial 25 (COMPLETE, value=0.6127): S01=S03@15, S01=S06@10, S01=S07@13, S03=S06@12, S03=S08@10, S08=S02@10, S08=S06@13, S08=S09@12
+Trial 31 (COMPLETE, value=0.5989): S03=S06@20, S08=S07@15
+Trial 33 (COMPLETE, value=0.6260, **BEST**): S01=S07@16, S01=S08@18, S08=S03@16, S08=S06@17, S08=S07@14
+Trial 36 (COMPLETE, value=0.6031): S01=S06@18, S01=S09@15, S03=S02@15, S03=S07@16, S08=S06@18, S08=S07@13, S08=S09@16
+Trial 39 (COMPLETE, value=0.6137): S01=S02@13, S01=S06@14, S01=S08@15, S03=S02@13, S03=S06@15, S03=S07@14, S03=S09@13, S08=S03@13, S08=S05@14, S08=S07@12, S08=S09@12
+
+>>> TRIAL 33 (THE BEST TRIAL) IS NaN-AFFECTED. <<<
+Trial 33 had 5 of its 21 candidate trainings diverge to NaN loss (fold=S01
+candidates S07 @epoch16 and S08 @epoch18; fold=S08 candidates S03 @epoch16,
+S06 @epoch17, S07 @epoch14). This is flagged LOUDLY as instructed.
+
+HOWEVER -- important nuance verified below (not just asserted): whether
+this actually CORRUPTS the reported 0.6260 value depends on whether the
+SELECTED (median-rule) candidate for each fold was among the diverged
+ones, and whether the returned probabilities for that candidate were
+computed from a NaN-corrupted model or a rescued pre-divergence checkpoint.
+
+**Verification of the rescue mechanism:** trainer_tcn.py only saves a
+checkpoint when `val_loss < best_val_loss` -- any comparison with NaN is
+False in Python, so once a candidate's val loss goes NaN, NO further
+checkpoint save ever occurs and the LAST GOOD (pre-divergence) checkpoint
+is what run_split() reloads and evaluates. This mechanism only fails if a
+candidate's very FIRST epoch is already NaN (no checkpoint would ever
+exist to reload). Checked: the EARLIEST any candidate in the entire study
+went NaN was epoch 8 (multiple instances) -- every affected candidate had
+at least 7 valid epochs first, so a rescue checkpoint always existed.
+Cross-checked against results/optuna/trials_log_full_prauc.csv: ZERO
+missing/NaN values anywhere in the CSV (118 fold-rows total), and every
+fold_median_val_prauc value is a normal, plausible in-range number (min
+0.3015, max 0.6659, no exact-0 or out-of-[0,1] degenerate values that would
+indicate a corrupted probability array reached the scorer). This is strong
+evidence the checkpoint-rescue held throughout the study -- no trial's
+reported PR-AUC number is a raw NaN or a garbage value.
+
+For TRIAL 33 SPECIFICALLY: its S08-fold selected_val_subj was "S03"
+(score=0.6443) -- and S03 WAS one of the candidates that later diverged
+(NaN at epoch 16). So trial 33's reported value is NOT independent of the
+NaN event: it is the rescued pre-epoch-16 checkpoint's score for that
+candidate, not a fully clean 25-epoch convergent run. The S01-fold
+(selected=S05, score=0.6659, S05 never went NaN) and S03-fold (selected=S09,
+score=0.5677, S09 never went NaN) are unaffected. **Verdict: trial 33's
+0.6260 is not a corrupted/garbage number, but 1 of its 3 fold scores comes
+from a training run that later became unstable and had to be rescued by
+early-stopping's checkpoint mechanism, rather than a run that trained
+cleanly start to finish.** Treat it as usable but not fully trustworthy for
+"this exact hyperparameter combination trains stably" -- see section 4.
+
+Total: 16/40 trials NaN-affected (any candidate); of those, 10/40 trials
+had the SPECIFIC selected/scoring candidate itself go NaN (i.e., the
+reported number for that fold was checkpoint-rescued, not from a clean
+run) -- trial 33 is one of these 10.
+
+----------------------------------------------------------------------
+2. TOP-5 TRIALS BY OBJECTIVE
+----------------------------------------------------------------------
+trial | val_PR_AUC | CLEAN?              | arch       | dropout | focal_a | focal_g | lr       | wd       | batch
+------|------------|---------------------|------------|---------|---------|---------|----------|----------|------
+  33  | 0.6260     | NaN-CONTAMINATED*   | K3/[1,2,8] | 0.2019  | 0.7748  | 2.1376  | 0.001358 | 0.000568 | 128
+  23  | 0.6248     | NaN-CONTAMINATED*   | K3/[1,4,8] | 0.2170  | 0.7910  | 1.8083  | 0.001257 | 0.000899 | 128
+  22  | 0.6202     | NaN-CONTAMINATED*   | K3/[1,4,8] | 0.2231  | 0.7783  | 1.8237  | 0.001243 | 0.000610 | 128
+  26  | 0.6173     | CLEAN               | K5/[1,2,4] | 0.1883  | 0.7479  | 2.0200  | 0.000780 | 0.000699 | 256
+   4  | 0.6146     | NaN-CONTAMINATED**  | K3/[1,4,8] | 0.2640  | 0.5739  | 2.9392  | 0.001396 | 0.000939 | 128
+
+* = the SELECTED (score-determining) candidate for at least one fold was
+    itself among the diverged candidates (rescued-checkpoint score, see
+    section 1).
+** = NaN occurred somewhere in trial 4's 21 candidates, but NOT in any of
+    the 3 SELECTED candidates -- its 0.6146 is from fully clean training
+    runs despite the trial having instability elsewhere.
+
+BEST CLEAN TRIAL (no NaN anywhere in any of its 21 candidate trainings):
+  Trial 26, val_PR_AUC = 0.617319
+  arch_idx=3 -> kernel_size=5, dilations=[1, 2, 4]
+  dropout=0.188296
+  focal_alpha=0.747900
+  focal_gamma=2.020007
+  lr=0.000780 (0.0007796859574094177)
+  weight_decay=0.000699 (0.0006993049068188759)
+  batch_size=256
+
+----------------------------------------------------------------------
+3. ARCHITECTURE CLUSTERING
+----------------------------------------------------------------------
+Among all 37 COMPLETE trials:  K3/[1,4,8]=17, K3/[1,2,8]=8, K5/[1,2,4]=7, K3/[1,2,4]=5
+Among the top 10 by objective: K3/[1,4,8]=6,  K3/[1,2,8]=2, K5/[1,2,4]=1, K3/[1,2,4]=1
+
+K3/[1,4,8] (arch_idx=1, the WIDEST-dilation K=3 combo, RF=53) both
+DOMINATES the overall trial count (TPE increasingly sampled it after early
+good results) AND dominates the top-10 leaderboard (6/10). This is the
+single clearest architecture signal in the study. Trial 33's arch
+(K3/[1,2,8], RF=45) and the best-clean trial 26's arch (K5/[1,2,4], RF=57,
+the ORIGINAL baseline architecture) are both represented once each near
+the top -- notably, trial 37 (rank #8, value=0.6132, arch=K3/[1,2,8],
+SAME architecture as trial 33) achieved a close, FULLY CLEAN result with a
+lower lr (0.000897 vs trial 33's 0.001358) -- suggestive that the same
+architecture can reach nearly the same score without instability at a
+safer learning rate (see section 4).
+
+----------------------------------------------------------------------
+4. HONEST READ: IS THE TUNING GAIN REAL, OR IS THE TOP-5 BASICALLY TIED?
+----------------------------------------------------------------------
+Top1 (0.6260) - Top5 (0.6146) gap:      0.0113
+Top1 (0.6260) - median (37 trials) gap: 0.0271
+Std of all 37 COMPLETE trial values:    0.0408
+
+The top 5-10 trials form a fairly tight CLUSTER (spread of ~0.011 among
+the top 5), sitting meaningfully above the field median (~0.027 gap, more
+than half a standard deviation) -- so the tuning IS finding a real,
+non-trivial region of better-performing hyperparameters, not pure noise:
+architecture (K3/[1,4,8] and K3/[1,2,8] over the baseline K5/[1,2,4]) and a
+mid-to-upper lr band both show up consistently among the leaders, not just
+in one lucky trial.
+
+BUT within that top cluster, the ranking between trial 33 (0.6260) and the
+best CLEAN trial 26 (0.6173, a gap of only 0.0087) is NOT clearly
+distinguishable from noise once NaN-rescue risk is accounted for --
+0.0087 is smaller than the top-5 spread itself (0.0113) and much smaller
+than the field's std (0.0408). Practically: pick the best CLEAN trial (26)
+or a similarly-clean, similarly-scoring trial (e.g. 37, also clean,
+0.6132, SAME architecture as trial 33) as the safer choice for a stable
+production run, rather than trial 33's nominally-highest-but-rescued
+number. The apparent "win" of trial 33 over a clean trial like 26 is
+small enough that it plausibly reflects which run's checkpoint got
+luckily rescued right before its best epoch, not a genuinely superior
+hyperparameter combination.
+
+----------------------------------------------------------------------
+5. LEARNING-RATE FLAG (for any future study's search-space design)
+----------------------------------------------------------------------
+lr range searched: [1e-4, 3e-3] (log scale). Split at the geometric-ish
+practical threshold of 1e-3 (roughly upper-third of the log-scaled range):
+
+  NaN-affected trials (n=16): lr range [0.001051, 0.002880], ALL 16/16
+    have lr > 1e-3.
+  Clean trials (n=21):        lr range [0.000117, 0.002041], only 5/21
+    have lr > 1e-3.
+
+This is a near-PERFECT separation: every single NaN-affected trial used
+lr > 1e-3; only a minority of clean trials strayed into that range (and
+those that did, e.g. clean trial with lr=0.00204, evidently got lucky with
+its specific arch/dropout/batch_size combination). FLAG FOR ANY FUTURE
+STUDY: strongly consider lowering the upper lr bound from 3e-3 to
+somewhere around 1.5e-3-2e-3, or adding gradient clipping to trainer_tcn.py
+(a training-code change, out of scope for this read-only task) if the
+search needs to keep exploring lr > 1e-3 territory. Right now roughly 40%
+of trials are "spending" compute on runs that partially diverge, which is
+wasted search budget even though the checkpoint-rescue mechanism prevents
+outright corruption of the reported numbers.
+
+----------------------------------------------------------------------
+6. BOTTOM LINE
+----------------------------------------------------------------------
+- NaN audit: 16/40 trials (40%) had >=1 candidate diverge to NaN loss; 0
+  trials FAILED outright (checkpoint-rescue held in every case, verified
+  via the CSV having zero missing/degenerate values and no epoch-1 NaN
+  anywhere in the study).
+- TRIAL 33 (the nominal best, 0.6260) IS NaN-affected, and its S08-fold
+  score specifically came from a rescued (not fully clean) candidate
+  training. The number itself is not garbage, but it is not from a fully
+  stable run either.
+- RECOMMENDATION: do not adopt trial 33's params without reservation.
+  Prefer the BEST CLEAN trial (trial 26, val_PR_AUC=0.6173, K5/[1,2,4] --
+  the ORIGINAL baseline architecture, dropout=0.1883, focal_alpha=0.7479,
+  focal_gamma=2.0200, lr=0.000780, weight_decay=0.000699, batch_size=256)
+  or consider trial 37 (0.6132, clean, K3/[1,2,8] -- same architecture as
+  trial 33 but at a safer lr=0.000897) as a middle option if the
+  architecture change itself is judged worth it. The gap between trial 33
+  and the best clean alternative (0.0087) is smaller than the top-5's own
+  spread (0.0113) and well within the field's overall noise (std=0.0408) --
+  the tuning gain over the ORIGINAL baseline is real and worth adopting,
+  but WHICH clean trial to promote is a closer call than the raw
+  leaderboard suggests.
+- lr > 1e-3 is the dominant, near-perfect predictor of NaN divergence in
+  this search space -- flagged for any future study's search-space design.
+- Final 50-epoch/8-fold run NOT executed -- awaiting your review and choice
+  of which (clean) params to promote via run_finalize().
+- No changes to data/ or src/ -- this was a read-only analysis of existing
+  log/CSV/sqlite artifacts.

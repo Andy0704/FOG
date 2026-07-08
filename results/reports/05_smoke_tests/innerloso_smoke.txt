@@ -1,0 +1,353 @@
+[SEED] 42
+[TASK] DETECTION (label at t, horizon=n/a)
+[DEVICE] cuda
+實驗資料夾已建立: /mnt/c/Project/115Daphnet_FoG/results/RUN_20260702_193653
+找到 10 位受試者: ['S01', 'S02', 'S03', 'S04', 'S05', 'S06', 'S07', 'S08', 'S09', 'S10']
+FoG 受試者 (LOSO 迴圈): ['S01', 'S02', 'S03', 'S05', 'S06', 'S07', 'S08', 'S09']
+本次僅執行 (test_subj): ['S01']
+
+==============================
+開始執行 LOSO Fold: 測試受試者為 【S01】
+==============================
+--- Inner LOSO: rotating val_subj over ['S02', 'S03', 'S05', 'S06', 'S07', 'S08', 'S09'] (test=S01 excluded) ---
+[RF] 57 (<= 64)
+ Train: 20419 windows, Val(S02): 2829 windows...
+開始訓練，使用裝置: cuda
+DEBUG -> TP: 174, FP: 251, TN: 2167, FN: 237
+Epoch 1/10 | Train Loss: 0.1014 | Val Loss: 0.0645 | F1: 0.4163 | FPR: 0.1038
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 187, FP: 181, TN: 2237, FN: 224
+Epoch 2/10 | Train Loss: 0.0889 | Val Loss: 0.0597 | F1: 0.4801 | FPR: 0.0749
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 276, FP: 335, TN: 2083, FN: 135
+Epoch 3/10 | Train Loss: 0.0844 | Val Loss: 0.0571 | F1: 0.5401 | FPR: 0.1385
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 269, FP: 306, TN: 2112, FN: 142
+Epoch 4/10 | Train Loss: 0.0812 | Val Loss: 0.0551 | F1: 0.5456 | FPR: 0.1266
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 362, FP: 661, TN: 1757, FN: 49
+Epoch 5/10 | Train Loss: 0.0792 | Val Loss: 0.0563 | F1: 0.5049 | FPR: 0.2734
+Val Loss 未進步，容忍度: 1/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 331, FP: 386, TN: 2032, FN: 80
+Epoch 6/10 | Train Loss: 0.0774 | Val Loss: 0.0513 | F1: 0.5869 | FPR: 0.1596
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 350, FP: 450, TN: 1968, FN: 61
+Epoch 7/10 | Train Loss: 0.0756 | Val Loss: 0.0510 | F1: 0.5780 | FPR: 0.1861
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 361, FP: 449, TN: 1969, FN: 50
+Epoch 8/10 | Train Loss: 0.0738 | Val Loss: 0.0503 | F1: 0.5913 | FPR: 0.1857
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 364, FP: 455, TN: 1963, FN: 47
+Epoch 9/10 | Train Loss: 0.0731 | Val Loss: 0.0491 | F1: 0.5919 | FPR: 0.1882
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 372, FP: 522, TN: 1896, FN: 39
+Epoch 10/10 | Train Loss: 0.0707 | Val Loss: 0.0495 | F1: 0.5701 | FPR: 0.2159
+Val Loss 未進步，容忍度: 1/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+Loaded best checkpoint (early-stopped on val=S02)
+[inner val=S02] ROC-AUC(smoothed)=0.9547  wall-clock=36.2s  epochs_run=10
+[RF] 57 (<= 64)
+ Train: 19229 windows, Val(S03): 4019 windows...
+開始訓練，使用裝置: cuda
+DEBUG -> TP: 94, FP: 191, TN: 3158, FN: 576
+Epoch 1/10 | Train Loss: 0.0991 | Val Loss: 0.0862 | F1: 0.1969 | FPR: 0.0570
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 165, FP: 263, TN: 3086, FN: 505
+Epoch 2/10 | Train Loss: 0.0870 | Val Loss: 0.0798 | F1: 0.3005 | FPR: 0.0785
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 184, FP: 280, TN: 3069, FN: 486
+Epoch 3/10 | Train Loss: 0.0819 | Val Loss: 0.0771 | F1: 0.3245 | FPR: 0.0836
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 154, FP: 185, TN: 3164, FN: 516
+Epoch 4/10 | Train Loss: 0.0794 | Val Loss: 0.0768 | F1: 0.3053 | FPR: 0.0552
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 277, FP: 357, TN: 2992, FN: 393
+Epoch 5/10 | Train Loss: 0.0776 | Val Loss: 0.0717 | F1: 0.4248 | FPR: 0.1066
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 261, FP: 304, TN: 3045, FN: 409
+Epoch 6/10 | Train Loss: 0.0756 | Val Loss: 0.0716 | F1: 0.4227 | FPR: 0.0908
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 234, FP: 262, TN: 3087, FN: 436
+Epoch 7/10 | Train Loss: 0.0725 | Val Loss: 0.0719 | F1: 0.4014 | FPR: 0.0782
+Val Loss 未進步，容忍度: 1/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 294, FP: 331, TN: 3018, FN: 376
+Epoch 8/10 | Train Loss: 0.0717 | Val Loss: 0.0695 | F1: 0.4541 | FPR: 0.0988
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 341, FP: 391, TN: 2958, FN: 329
+Epoch 9/10 | Train Loss: 0.0699 | Val Loss: 0.0675 | F1: 0.4864 | FPR: 0.1168
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 334, FP: 335, TN: 3014, FN: 336
+Epoch 10/10 | Train Loss: 0.0696 | Val Loss: 0.0677 | F1: 0.4989 | FPR: 0.1000
+Val Loss 未進步，容忍度: 1/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+Loaded best checkpoint (early-stopped on val=S03)
+[inner val=S03] ROC-AUC(smoothed)=0.8779  wall-clock=32.2s  epochs_run=10
+[RF] 57 (<= 64)
+ Train: 19069 windows, Val(S05): 4179 windows...
+開始訓練，使用裝置: cuda
+DEBUG -> TP: 110, FP: 161, TN: 2942, FN: 966
+Epoch 1/10 | Train Loss: 0.0964 | Val Loss: 0.1196 | F1: 0.1633 | FPR: 0.0519
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 101, FP: 98, TN: 3005, FN: 975
+Epoch 2/10 | Train Loss: 0.0797 | Val Loss: 0.1242 | F1: 0.1584 | FPR: 0.0316
+Val Loss 未進步，容忍度: 1/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 86, FP: 82, TN: 3021, FN: 990
+Epoch 3/10 | Train Loss: 0.0755 | Val Loss: 0.1210 | F1: 0.1383 | FPR: 0.0264
+Val Loss 未進步，容忍度: 2/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 127, FP: 120, TN: 2983, FN: 949
+Epoch 4/10 | Train Loss: 0.0727 | Val Loss: 0.1200 | F1: 0.1920 | FPR: 0.0387
+Val Loss 未進步，容忍度: 3/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 121, FP: 101, TN: 3002, FN: 955
+Epoch 5/10 | Train Loss: 0.0683 | Val Loss: 0.1245 | F1: 0.1864 | FPR: 0.0325
+Val Loss 未進步，容忍度: 4/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 150, FP: 119, TN: 2984, FN: 926
+Epoch 6/10 | Train Loss: 0.0680 | Val Loss: 0.1262 | F1: 0.2230 | FPR: 0.0383
+Val Loss 未進步，容忍度: 5/5
+觸發 Early Stopping，提早結束訓練！
+Loaded best checkpoint (early-stopped on val=S05)
+[inner val=S05] ROC-AUC(smoothed)=0.6143  wall-clock=18.9s  epochs_run=6
+[RF] 57 (<= 64)
+ Train: 19269 windows, Val(S06): 3979 windows...
+開始訓練，使用裝置: cuda
+DEBUG -> TP: 62, FP: 706, TN: 2990, FN: 221
+Epoch 1/10 | Train Loss: 0.1144 | Val Loss: 0.0645 | F1: 0.1180 | FPR: 0.1910
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 35, FP: 294, TN: 3402, FN: 248
+Epoch 2/10 | Train Loss: 0.0930 | Val Loss: 0.0567 | F1: 0.1144 | FPR: 0.0795
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 48, FP: 230, TN: 3466, FN: 235
+Epoch 3/10 | Train Loss: 0.0878 | Val Loss: 0.0550 | F1: 0.1711 | FPR: 0.0622
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 72, FP: 248, TN: 3448, FN: 211
+Epoch 4/10 | Train Loss: 0.0839 | Val Loss: 0.0540 | F1: 0.2388 | FPR: 0.0671
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 65, FP: 171, TN: 3525, FN: 218
+Epoch 5/10 | Train Loss: 0.0810 | Val Loss: 0.0515 | F1: 0.2505 | FPR: 0.0463
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 75, FP: 134, TN: 3562, FN: 208
+Epoch 6/10 | Train Loss: 0.0781 | Val Loss: 0.0493 | F1: 0.3049 | FPR: 0.0363
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 84, FP: 160, TN: 3536, FN: 199
+Epoch 7/10 | Train Loss: 0.0766 | Val Loss: 0.0483 | F1: 0.3188 | FPR: 0.0433
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 92, FP: 181, TN: 3515, FN: 191
+Epoch 8/10 | Train Loss: 0.0743 | Val Loss: 0.0478 | F1: 0.3309 | FPR: 0.0490
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 95, FP: 191, TN: 3505, FN: 188
+Epoch 9/10 | Train Loss: 0.0738 | Val Loss: 0.0474 | F1: 0.3339 | FPR: 0.0517
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 99, FP: 183, TN: 3513, FN: 184
+Epoch 10/10 | Train Loss: 0.0722 | Val Loss: 0.0459 | F1: 0.3504 | FPR: 0.0495
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+Loaded best checkpoint (early-stopped on val=S06)
+[inner val=S06] ROC-AUC(smoothed)=0.8200  wall-clock=32.0s  epochs_run=10
+[RF] 57 (<= 64)
+ Train: 20029 windows, Val(S07): 3219 windows...
+開始訓練，使用裝置: cuda
+DEBUG -> TP: 97, FP: 1000, TN: 2008, FN: 114
+Epoch 1/10 | Train Loss: 0.1251 | Val Loss: 0.0678 | F1: 0.1483 | FPR: 0.3324
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 110, FP: 824, TN: 2184, FN: 101
+Epoch 2/10 | Train Loss: 0.0908 | Val Loss: 0.0637 | F1: 0.1921 | FPR: 0.2739
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 107, FP: 682, TN: 2326, FN: 104
+Epoch 3/10 | Train Loss: 0.0856 | Val Loss: 0.0592 | F1: 0.2140 | FPR: 0.2267
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 120, FP: 649, TN: 2359, FN: 91
+Epoch 4/10 | Train Loss: 0.0808 | Val Loss: 0.0583 | F1: 0.2449 | FPR: 0.2158
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 101, FP: 430, TN: 2578, FN: 110
+Epoch 5/10 | Train Loss: 0.0779 | Val Loss: 0.0538 | F1: 0.2722 | FPR: 0.1430
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 119, FP: 505, TN: 2503, FN: 92
+Epoch 6/10 | Train Loss: 0.0761 | Val Loss: 0.0542 | F1: 0.2850 | FPR: 0.1679
+Val Loss 未進步，容忍度: 1/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 114, FP: 439, TN: 2569, FN: 97
+Epoch 7/10 | Train Loss: 0.0741 | Val Loss: 0.0518 | F1: 0.2984 | FPR: 0.1459
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 122, FP: 484, TN: 2524, FN: 89
+Epoch 8/10 | Train Loss: 0.0728 | Val Loss: 0.0526 | F1: 0.2987 | FPR: 0.1609
+Val Loss 未進步，容忍度: 1/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 124, FP: 434, TN: 2574, FN: 87
+Epoch 9/10 | Train Loss: 0.0717 | Val Loss: 0.0505 | F1: 0.3225 | FPR: 0.1443
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 121, FP: 453, TN: 2555, FN: 90
+Epoch 10/10 | Train Loss: 0.0705 | Val Loss: 0.0513 | F1: 0.3083 | FPR: 0.1506
+Val Loss 未進步，容忍度: 1/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+Loaded best checkpoint (early-stopped on val=S07)
+[inner val=S07] ROC-AUC(smoothed)=0.8793  wall-clock=33.5s  epochs_run=10
+[RF] 57 (<= 64)
+ Train: 21709 windows, Val(S08): 1539 windows...
+開始訓練，使用裝置: cuda
+DEBUG -> TP: 5, FP: 18, TN: 1090, FN: 426
+Epoch 1/10 | Train Loss: 0.1020 | Val Loss: 0.1276 | F1: 0.0220 | FPR: 0.0162
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 1, FP: 7, TN: 1101, FN: 430
+Epoch 2/10 | Train Loss: 0.0820 | Val Loss: 0.1396 | F1: 0.0046 | FPR: 0.0063
+Val Loss 未進步，容忍度: 1/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 0, FP: 2, TN: 1106, FN: 431
+Epoch 3/10 | Train Loss: 0.0775 | Val Loss: 0.1699 | F1: 0.0000 | FPR: 0.0018
+Val Loss 未進步，容忍度: 2/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 1, FP: 2, TN: 1106, FN: 430
+Epoch 4/10 | Train Loss: 0.0730 | Val Loss: 0.1857 | F1: 0.0046 | FPR: 0.0018
+Val Loss 未進步，容忍度: 3/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 1, FP: 0, TN: 1108, FN: 430
+Epoch 5/10 | Train Loss: 0.0710 | Val Loss: 0.2058 | F1: 0.0046 | FPR: 0.0000
+Val Loss 未進步，容忍度: 4/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 1, FP: 1, TN: 1107, FN: 430
+Epoch 6/10 | Train Loss: 0.0684 | Val Loss: 0.1969 | F1: 0.0046 | FPR: 0.0009
+Val Loss 未進步，容忍度: 5/5
+觸發 Early Stopping，提早結束訓練！
+Loaded best checkpoint (early-stopped on val=S08)
+[inner val=S08] ROC-AUC(smoothed)=0.4033  wall-clock=21.6s  epochs_run=6
+[RF] 57 (<= 64)
+ Train: 19769 windows, Val(S09): 3479 windows...
+開始訓練，使用裝置: cuda
+DEBUG -> TP: 78, FP: 377, TN: 2511, FN: 513
+Epoch 1/10 | Train Loss: 0.1033 | Val Loss: 0.0892 | F1: 0.1491 | FPR: 0.1305
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 85, FP: 261, TN: 2627, FN: 506
+Epoch 2/10 | Train Loss: 0.0841 | Val Loss: 0.0927 | F1: 0.1814 | FPR: 0.0904
+Val Loss 未進步，容忍度: 1/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 90, FP: 220, TN: 2668, FN: 501
+Epoch 3/10 | Train Loss: 0.0781 | Val Loss: 0.0911 | F1: 0.1998 | FPR: 0.0762
+Val Loss 未進步，容忍度: 2/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 105, FP: 251, TN: 2637, FN: 486
+Epoch 4/10 | Train Loss: 0.0750 | Val Loss: 0.0933 | F1: 0.2218 | FPR: 0.0869
+Val Loss 未進步，容忍度: 3/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 111, FP: 292, TN: 2596, FN: 480
+Epoch 5/10 | Train Loss: 0.0735 | Val Loss: 0.0894 | F1: 0.2233 | FPR: 0.1011
+Val Loss 未進步，容忍度: 4/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 129, FP: 235, TN: 2653, FN: 462
+Epoch 6/10 | Train Loss: 0.0708 | Val Loss: 0.0905 | F1: 0.2702 | FPR: 0.0814
+Val Loss 未進步，容忍度: 5/5
+觸發 Early Stopping，提早結束訓練！
+Loaded best checkpoint (early-stopped on val=S09)
+[inner val=S09] ROC-AUC(smoothed)=0.5791  wall-clock=19.7s  epochs_run=6
+Selected val_subj (median inner ROC-AUC rule): S06 (score=0.8200)
+Train subjects: ['S02', 'S03', 'S05', 'S07', 'S08', 'S09']
+Val subject:    S06 (selected via inner LOSO)
+Test subject:   S01
+[RF] 57 (<= 64)
+ Train: 19269 windows, Val(S06): 3979 windows...
+開始訓練，使用裝置: cuda
+DEBUG -> TP: 65, FP: 558, TN: 3138, FN: 218
+Epoch 1/10 | Train Loss: 0.1096 | Val Loss: 0.0590 | F1: 0.1435 | FPR: 0.1510
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 82, FP: 517, TN: 3179, FN: 201
+Epoch 2/10 | Train Loss: 0.0938 | Val Loss: 0.0587 | F1: 0.1859 | FPR: 0.1399
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 98, FP: 354, TN: 3342, FN: 185
+Epoch 3/10 | Train Loss: 0.0878 | Val Loss: 0.0558 | F1: 0.2667 | FPR: 0.0958
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 102, FP: 242, TN: 3454, FN: 181
+Epoch 4/10 | Train Loss: 0.0837 | Val Loss: 0.0518 | F1: 0.3254 | FPR: 0.0655
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 119, FP: 314, TN: 3382, FN: 164
+Epoch 5/10 | Train Loss: 0.0812 | Val Loss: 0.0519 | F1: 0.3324 | FPR: 0.0850
+Val Loss 未進步，容忍度: 1/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 144, FP: 376, TN: 3320, FN: 139
+Epoch 6/10 | Train Loss: 0.0785 | Val Loss: 0.0512 | F1: 0.3587 | FPR: 0.1017
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 140, FP: 321, TN: 3375, FN: 143
+Epoch 7/10 | Train Loss: 0.0769 | Val Loss: 0.0490 | F1: 0.3763 | FPR: 0.0869
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 143, FP: 355, TN: 3341, FN: 140
+Epoch 8/10 | Train Loss: 0.0752 | Val Loss: 0.0491 | F1: 0.3662 | FPR: 0.0960
+Val Loss 未進步，容忍度: 1/5
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 141, FP: 350, TN: 3346, FN: 142
+Epoch 9/10 | Train Loss: 0.0744 | Val Loss: 0.0475 | F1: 0.3643 | FPR: 0.0947
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+DEBUG -> TP: 137, FP: 309, TN: 3387, FN: 146
+Epoch 10/10 | Train Loss: 0.0733 | Val Loss: 0.0458 | F1: 0.3759 | FPR: 0.0836
+發現最佳模型，已儲存！
+🔍 正在載入最佳模型權重進行 ROC 分析...
+Loaded best checkpoint (early-stopped on val=S06)
+Final retrain done (train=['S02', 'S03', 'S05', 'S07', 'S08', 'S09'], val=S06) wall-clock=32.1s epochs_run=10
+【S01】 (val=S06) 凍結 Threshold: 0.3737
+【S01】 Test_F1: 0.2759, Test_PR_AUC: 0.2548, Test_ROC_AUC: 0.7752
+ 已儲存 ROC 圖: /mnt/c/Project/115Daphnet_FoG/results/RUN_20260702_193653/curves/roc_S01.png
+
+============================================================
+ LOSO 交叉驗證最終總結報告
+============================================================
+
+ LOSO 總結報告已儲存: /mnt/c/Project/115Daphnet_FoG/results/RUN_20260702_193653/loso_summary_20260702_193653.csv
+
+ 整體平均表現 (frozen-threshold, TEST subject only):
+ Mean Test_F1:      0.2759 ± nan
+ Mean Test_PR_AUC:  0.2548 ± nan
+ Mean Test_ROC_AUC: 0.7752 ± nan
+詳細預測機率已存至: /mnt/c/Project/115Daphnet_FoG/results/RUN_20260702_193653/loso_detailed_predictions_20260702_193653.csv
+
+============================================================
+ WALL-CLOCK ESTIMATE (ADR-003 inner-LOSO cost projection)
+============================================================
+Observed this run: 8 model(s) trained, n_epochs cap=10, total wall-clock=226.2s
+Avg wall-clock per split: 28.3s (avg 8.5 epochs run per split)
+Avg wall-clock per epoch: 3.33s
+Projected FULL RUN (8 outer folds x 8 splits/fold x 50 epochs, upper bound / no early stopping):
+  10645s  (~177.4 min, ~2.96 hr)
+Assumes linear scaling with epoch count and similar per-split cost across subjects/folds; actual time will likely be LOWER once patience=5 early stopping triggers on most splits, and may vary with per-subject data volume.
