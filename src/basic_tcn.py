@@ -1,6 +1,10 @@
 import torch
 import torch.nn as nn
-from torch.nn.utils import weight_norm
+from torch.nn.utils.parametrizations import weight_norm
+
+
+def receptive_field(kernel_size, dilations, n_conv_per_block=2):
+    return 1 + n_conv_per_block * sum((kernel_size - 1) * d for d in dilations)
 
 class Chomp1d(nn.Module):
     """專門用來切除右側 Padding，確保時間上的因果關係"""
@@ -43,17 +47,27 @@ class TemporalBlock(nn.Module):
         return self.relu(out + res) # 核心：殘差相加
     
 class BasicTCN(nn.Module):
-    def __init__(self, n_channels=3, n_classes=1, num_channels=[32, 64, 128], kernel_size=5, dropout=0.2):
+    def __init__(self, n_channels=3, n_classes=1, num_channels=[32, 64, 128], kernel_size=5,
+                 dropout=0.2, dilations=None, window_size=64):
         super(BasicTCN, self).__init__()
-        layers = []
         num_levels = len(num_channels)
+        if dilations is None:
+            dilations = [2 ** i for i in range(num_levels)]
+
+        rf = receptive_field(kernel_size, dilations, 2)
+        if rf > window_size:
+            raise ValueError(f"RF={rf} > window_size={window_size} "
+                              f"(K={kernel_size}, dilations={dilations}); skip this combo.")
+        print(f"[RF] {rf} (<= {window_size})")
+
+        layers = []
         for i in range(num_levels):
-            dilation_size = 2 ** i
+            dilation_size = dilations[i]
             in_channels = n_channels if i == 0 else num_channels[i-1]
             out_channels = num_channels[i]
-            layers += [TemporalBlock(in_channels, out_channels, kernel_size, stride=1, 
+            layers += [TemporalBlock(in_channels, out_channels, kernel_size, stride=1,
                                      dilation=dilation_size,
-                                     padding=(kernel_size-1) * dilation_size, 
+                                     padding=(kernel_size-1) * dilation_size,
                                      dropout=dropout)]
 
         self.network = nn.Sequential(*layers)

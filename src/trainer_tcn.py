@@ -19,12 +19,18 @@ class BinaryFocalLoss(nn.Module):
         return focal_loss.mean()
 
 class TCNTrainer:
-    def __init__(self, model, device='cpu'):
+    def __init__(self, model, device='cpu', alpha=0.75, gamma=2.0, lr=0.0001, weight_decay=0.0001,
+                 checkpoint_path='best_model.pth'):
         self.device = torch.device(device)
         self.model = model.to(self.device)
-        self.criterion = BinaryFocalLoss()
-        self.optimizer = optim.Adam(self.model.parameters(), lr=0.0001, weight_decay=0.0001)
+        self.criterion = BinaryFocalLoss(alpha=alpha, gamma=gamma)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)
         self.history = {'train_loss': [], 'val_loss': [], 'epoch_f1' : [], 'epoch_fpr' : []}
+        # Unique per-call path avoids cross-run/cross-process collisions on a shared
+        # filename (two trainings with different architectures -- or two concurrent
+        # processes -- writing 'best_model.pth' in the same CWD can silently corrupt
+        # each other's checkpoint; see ADR-013).
+        self.checkpoint_path = checkpoint_path
 
         # 加入 torchmetrics 並移動到對應的裝置
         self.val_f1 = BinaryF1Score(threshold=0.4).to(self.device)
@@ -64,7 +70,7 @@ class TCNTrainer:
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 patience_counter = 0
-                torch.save(self.model.state_dict(), 'best_model.pth')
+                torch.save(self.model.state_dict(), self.checkpoint_path)
                 print("發現最佳模型，已儲存！")
             else:
                 patience_counter += 1
