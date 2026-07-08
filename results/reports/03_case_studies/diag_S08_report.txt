@@ -1,0 +1,248 @@
+==============================================================================
+Subject diagnostic report: S08 (vs healthy reference S05)
+Source run for saved probs: RUN_20260702_172209
+Task: DETECTION. READ-ONLY analysis -- no training, no eval-logic changes.
+==============================================================================
+
+------------------------------------------------------------------------------
+1. RAW LABEL COMPOSITION (before 0-filter, per run file)
+------------------------------------------------------------------------------
+
+[S08]
+      file  invalid_0  noFoG_1  FoG_2  FoG_fraction_post_filter
+S08R01.txt      87305    36425  12859                  0.260916
+FoG events: 14, total FoG duration: 200.9 s
+Event list (start_sample/end_sample in raw-file index, duration_s):
+      file  start_sample  end_sample  duration_s
+S08R01.txt         46645       48016       21.42
+S08R01.txt         51639       52476       13.08
+S08R01.txt         64699       65982       20.05
+S08R01.txt         66549       67856       20.42
+S08R01.txt         69395       70537       17.84
+S08R01.txt         71389       72228       13.11
+S08R01.txt         86521       86661        2.19
+S08R01.txt         87667       88039        5.81
+S08R01.txt         90336       90883        8.55
+S08R01.txt        113440      114117       10.58
+S08R01.txt        115653      117013       21.25
+S08R01.txt        118442      119483       16.27
+S08R01.txt        120068      121356       20.12
+S08R01.txt        122066      122721       10.23
+
+[S05]
+      file  invalid_0  noFoG_1  FoG_2  FoG_fraction_post_filter
+S05R01.txt      42042    50491  17353                  0.255778
+S05R02.txt      34824    52905  13017                  0.197461
+FoG events: 66, total FoG duration: 474.5 s
+Event list (start_sample/end_sample in raw-file index, duration_s):
+      file  start_sample  end_sample  duration_s
+S05R01.txt         31840       32020        2.81
+S05R01.txt         32950       33181        3.61
+S05R01.txt         34132       34391        4.05
+S05R01.txt         35151       35518        5.73
+S05R01.txt         44874       45033        2.48
+S05R01.txt         52196       52422        3.53
+S05R01.txt         52919       53427        7.94
+S05R01.txt         53743       54310        8.86
+S05R01.txt         54788       55725       14.64
+S05R01.txt         56060       56734       10.53
+S05R01.txt         56868       57110        3.78
+S05R01.txt         57508       57953        6.95
+S05R01.txt         58091       59077       15.41
+S05R01.txt         59188       59390        3.16
+S05R01.txt         60382       60851        7.33
+S05R01.txt         61076       61419        5.36
+S05R01.txt         61749       61901        2.38
+S05R01.txt         62080       62423        5.36
+S05R01.txt         63970       64125        2.42
+S05R01.txt         64324       64752        6.69
+S05R01.txt         64982       65728       11.66
+S05R01.txt         65840       66043        3.17
+S05R01.txt         69024       69106        1.28
+S05R01.txt         69303       69589        4.47
+S05R01.txt         70064       70244        2.81
+S05R01.txt         80578       80643        1.02
+S05R01.txt         80724       81589       13.52
+S05R01.txt         84251       84905       10.22
+S05R01.txt         85978       86026        0.75
+S05R01.txt         86925       87560        9.92
+S05R01.txt         89260       90208       14.81
+S05R01.txt         96862       97376        8.03
+S05R01.txt         97598       97916        4.97
+S05R01.txt         98214       98612        6.22
+S05R01.txt         98676       99067        6.11
+S05R01.txt         99450       99851        6.27
+S05R01.txt        100048      100618        8.91
+S05R01.txt        101148      101905       11.83
+S05R01.txt        102285      102684        6.23
+S05R01.txt        102797      103817       15.94
+S05R02.txt         27601       27925        5.06
+S05R02.txt         28809       29178        5.77
+S05R02.txt         31985       32129        2.25
+S05R02.txt         32418       32715        4.64
+S05R02.txt         32896       34073       18.39
+S05R02.txt         34424       36254       28.59
+S05R02.txt         36531       36975        6.94
+S05R02.txt         37468       37579        1.73
+S05R02.txt         37709       38287        9.03
+S05R02.txt         38762       39391        9.83
+S05R02.txt         41825       42074        3.89
+S05R02.txt         46124       46583        7.17
+S05R02.txt         46840       47102        4.09
+S05R02.txt         48696       49047        5.48
+S05R02.txt         50104       50559        7.11
+S05R02.txt         81383       81440        0.89
+S05R02.txt         82455       82673        3.41
+S05R02.txt         83613       83905        4.56
+S05R02.txt         85836       86145        4.83
+S05R02.txt         86579       86905        5.09
+S05R02.txt         87313       88740       22.30
+S05R02.txt         89206       90389       18.48
+S05R02.txt         90834       91253        6.55
+S05R02.txt         91360       91599        3.73
+S05R02.txt         91902       92468        8.84
+S05R02.txt         92613       92915        4.72
+
+------------------------------------------------------------------------------
+2. WINDOWING (window=64, step=32, any-overlap positive label)
+------------------------------------------------------------------------------
+subject  pos_windows  neg_windows  total_windows  pos_fraction
+    S01          251         3548           3799        0.0661
+    S02          411         2418           2829        0.1453
+    S03          670         3349           4019        0.1667
+    S05         1076         3103           4179        0.2575
+    S06          283         3696           3979        0.0711
+    S07          211         3008           3219        0.0655
+    S08          431         1108           1539        0.2801
+    S09          591         2888           3479        0.1699
+
+[S08] pos_fraction=0.2801  pool(excl. S08) mean=0.1346 std=0.0719  z=2.02  -> FLAG (>2 std from pool)
+
+[S05] pos_fraction=0.2575  pool(excl. S05) mean=0.1378 std=0.0785  z=1.52  -> within pool range
+
+------------------------------------------------------------------------------
+3. PER-AXIS ACCEL STATS (ankle x/y/z, raw mg, post 0-filter samples)
+------------------------------------------------------------------------------
+             group    axis    mean    std      min     max    skew  kurtosis
+               S08 ankle_x  176.78 243.97  -1939.0  4121.0   3.046    19.573
+               S08 ankle_y  981.70 119.22   -343.0  3411.0   0.265    25.405
+               S08 ankle_z  323.18  89.09  -1049.0  1831.0  -0.473    19.671
+               S05 ankle_x  -28.86 493.83  -5010.0 27651.0  -0.070    96.895
+               S05 ankle_y  989.50 357.83  -7166.0 18693.0   3.219    96.278
+               S05 ankle_z  280.13 293.59 -31487.0 13144.0 -19.748  2094.181
+pool(excl.S08,S05) ankle_x  -10.85 569.09 -30204.0 25858.0   4.356   248.242
+pool(excl.S08,S05) ankle_y 1011.86 348.36 -16638.0 26117.0   9.279   531.789
+pool(excl.S08,S05) ankle_z  262.10 302.70 -17918.0 26626.0   1.472   676.975
+
+Sign-flip / mis-orientation check: compare 'mean' and 'skew' sign per axis across
+groups. A consistent sign flip on one axis (opposite sign vs pool, same magnitude)
+or a strongly divergent kurtosis indicates mounted-backwards / mis-scaled sensor.
+
+------------------------------------------------------------------------------
+4. PLOTS
+------------------------------------------------------------------------------
+(a) Raw 3-axis signal around first FoG onset, S08 vs S05: /mnt/c/Project/115Daphnet_FoG/results/reports/diag_S08/raw_segment_S08_vs_S05.png
+(b) Predicted-prob histogram by true label, S08 (source: /mnt/c/Project/115Daphnet_FoG/results/RUN_20260702_172209/loso_detailed_predictions_20260702_172209.csv): /mnt/c/Project/115Daphnet_FoG/results/reports/diag_S08/prob_histogram_S08.png
+    (reference) S05 predicted-prob histogram: /mnt/c/Project/115Daphnet_FoG/results/reports/diag_S08/prob_histogram_S05.png
+
+------------------------------------------------------------------------------
+Predicted-probability summary by true label (from saved TEST predictions)
+------------------------------------------------------------------------------
+subject  n_windows  n_pos  n_neg  auc_raw_prob  auc_causal_median_k5  auc_if_flipped_raw  mean_prob_label0  mean_prob_label1  median_prob_label0  median_prob_label1
+    S08       1539    431   1108         0.405                0.3599               0.595            0.2293            0.2166              0.2252               0.202
+
+AUC on raw saved probs (no post-proc): 0.405
+AUC on causal_median(k=5)-smoothed probs (matches official run_loso.py Test_ROC_AUC scoring): 0.3599
+AUC if the raw-prob axis were flipped (1 - AUC): 0.595
+mean_prob(label=1) - mean_prob(label=0) = -0.0127 (negative => model ranks FoG windows LOWER than non-FoG windows)
+Effect of temporal smoothing on AUC: raw=0.405 -> smoothed=0.3599 (FURTHER below 0.5 (more anti-correlated)). If the ranking were pure
+i.i.d. noise, temporal averaging would pull AUC toward 0.5, not push it further away;
+a persistent or growing anti-correlation under smoothing points to a temporally
+structured (systematic) inversion rather than random per-window noise.
+
+==============================================================================
+ANALYSIS QUESTION: is S08's below-chance AUC most consistent with
+  (a) label inversion / sensor mis-orientation (data issue), or
+  (b) genuinely hard-but-valid data (keep, report honestly)?
+==============================================================================
+See reasoning below, built from sections 1-4 above. This is a recommendation
+only -- no automatic fix or exclusion was applied.
+
+Evidence AGAINST (a) sensor mis-orientation / label inversion:
+  - Gravity-aligned axis (ankle_y) mean is 981.7 mg for S08 vs 989.5 (S05) and
+    1011.9 (pool) -- same sign, same rough magnitude. A mounted-backwards or
+    axis-swapped sensor would most plausibly show a SIGN FLIP or large offset
+    on this axis (the axis nearest vertical / carrying the ~1g gravity
+    component); none is seen. ankle_z is also same-sign, similar magnitude
+    across S08/S05/pool. ankle_x shows a +176.8 mg offset vs pool's -10.9 mg,
+    but this is well within 1 pool std (569 mg) -- ordinary inter-subject
+    mounting-angle variance, not a flip.
+  - The predicted-probability histograms (section 4b) do NOT show two
+    well-separated clusters with the wrong one on top (which is what a clean
+    label/axis inversion would produce). Both S08 label=0 and label=1
+    distributions sit in the SAME narrow low-probability band (~0.15-0.30)
+    with heavy overlap; label=1 is only marginally left-shifted vs label=0
+    (mean_prob delta = -0.0127). Compare to S05 (healthy reference): same
+    heavy overlap, but label=1 is shifted RIGHT of label=0, in the correct
+    direction, also weakly. S08 looks like the SAME weak/noisy-signal regime
+    as a normal subject, just with the weak bias pointing the wrong way --
+    not a strong, cleanly-reversed signal.
+  - Raw label composition is physiologically plausible: 14 discrete FoG
+    events over ~201 s (S08R01), average ~14 s/event, in line with typical
+    FoG episode durations reported in the literature and with S05's own event
+    durations (66 events / 474 s, ~7 s/event). No signs of corrupted /
+    scrambled labels (no impossible run lengths, no all-or-nothing episodes).
+
+Evidence noted but NOT decisive for (a):
+  - S08's raw-prob AUC (0.405) drops further from 0.5 after causal_median
+    smoothing (0.360). Pure i.i.d. label noise would tend to regress toward
+    0.5 under temporal smoothing, not move further away, so there IS a
+    temporally-structured component to the mis-ranking. This is consistent
+    with a systematic pattern -- but "systematic" does not require a data
+    error; a real, consistent physiological difference produces the same
+    signature (see below).
+  - S08 has visibly lower signal variance than S05/pool on all 3 axes
+    (std 89-244 mg vs pool's 300-570 mg), and only 1 recording file vs 2 for
+    S05. Worth a calibration/gain sanity check as due diligence, but low
+    variance alone does not indicate axis inversion or label corruption.
+
+Evidence FOR (b) genuinely hard-but-valid data:
+  - The raw-segment plot (4a) shows a plausible AKINETIC freezing pattern for
+    S08: active gait-like oscillation on ankle_x/y before the labeled onset,
+    then a markedly QUIETER, lower-amplitude segment during/after the FoG
+    period, before oscillation resumes afterward. This is a recognized FoG
+    phenotype (akinetic/motor-block freezing, as opposed to high-frequency
+    leg-trembling freezing) -- i.e., the raw signal is doing something
+    physiologically sensible at the labeled onset, not something that looks
+    like a labeling glitch.
+  - S08's positive-window fraction (0.28) is elevated vs the pool (mean 0.13,
+    z=2.02) -- more FoG-labeled windows than typical, but not implausibly so,
+    and consistent with an internally coherent (if unusually FoG-heavy)
+    labeling for this subject.
+  - Put together: the most likely mechanism is that the model, trained
+    predominantly on subjects whose FoG events show HIGH-variance/trembling
+    signatures, learned "increased signal variance -> FoG". For S08, whose
+    FoG events are comparatively QUIET (akinetic), that learned rule fires
+    backwards -- predicting LOW probability exactly when S08 is freezing.
+    That produces a weak, temporally-consistent anti-correlation without any
+    need for inverted labels or a flipped sensor axis.
+
+CONCLUSION: (b) genuinely hard-but-valid data, not (a) label inversion or
+sensor mis-orientation. No axis sign-flip or offset large enough to explain a
+below-chance AUC was found; the predicted-probability distributions show weak
+overlap with a mild wrong-direction bias rather than a clean reversal; and the
+raw signal around the labeled FoG onset is physiologically consistent with a
+recognized (akinetic) FoG phenotype. The most defensible read is a genuine
+class-conditional domain-generalization failure -- the model's implicit
+"FoG = high variance" heuristic, learned from the other 7 subjects, does not
+transfer to S08's apparently akinetic freezing episodes.
+
+RECOMMENDATION (not applied): keep S08 in the LOSO pool and report its
+below-chance AUC honestly per CLAUDE.md S6 (do not drop it to inflate the
+mean). Consider it a candidate for a short qualitative case study in the
+write-up (trembling vs. akinetic FoG phenotypes as a generalization
+challenge). If time permits, a low-cost due-diligence step would be
+comparing S08's raw file byte-for-byte against the original Daphnet
+distribution to rule out a corrupted local copy -- but nothing in this
+analysis currently points to that being necessary.
+

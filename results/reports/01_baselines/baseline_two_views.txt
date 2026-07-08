@@ -1,0 +1,55 @@
+FoG TCN -- DETECTION baseline, two views (with S08 vs excl. S08)
+======================================================================
+source     : results/RUN_20260702_172209/loso_summary_20260702_172209.csv
+task       : DETECTION (label at t, horizon=n/a)
+protocol   : leak-free nested train/val/test split, threshold frozen on
+             val_subj, causal post-proc (ADR-003/004/005)
+generated  : read-only recompute from the existing RUN_20260702_172209 CSV
+             (no training, no eval-logic changes)
+
+Per-fold source values (unchanged from RUN_20260702_172209)
+----------------------------------------------------------------------
+Subject  Val_Subject  Best_Threshold  Test_F1  Test_PR_AUC  Test_ROC_AUC
+S01      S02          0.4312          0.3328   0.3880       0.8860
+S02      S01          0.3259          0.3342   0.3104       0.7736
+S03      S01          0.3220          0.5027   0.4448       0.8358
+S05      S01          0.3101          0.6482   0.6505       0.8569
+S06      S01          0.3758          0.1807   0.1444       0.6107
+S07      S01          0.3397          0.1704   0.4140       0.7776
+S08      S01          0.3857          0.0000   0.2343       0.3599
+S09      S01          0.4064          0.1901   0.3888       0.6983
+
+View A -- "with S08" (n=8 folds) -- OFFICIAL HEADLINE BASELINE
+----------------------------------------------------------------------
+  Mean Test_F1      : 0.2949 +/- 0.2061
+  Mean Test_PR_AUC   : 0.3719 +/- 0.1511
+  Mean Test_ROC_AUC  : 0.7249 +/- 0.1723
+This is the number reported in PROJECT_STATUS.md / EXPERIMENTS.md
+(RUN_20260702_172209). S08 is RETAINED in this mean per CLAUDE.md S6
+("report honestly under imbalance / do not drop hard subjects to inflate
+the mean"). See docs/case_study_S08.md for why S08 stays in.
+
+View B -- "excl. S08" (n=7 folds) -- SENSITIVITY VIEW ONLY, NOT HEADLINE
+----------------------------------------------------------------------
+  Mean Test_F1      : 0.3370 +/- 0.1817
+  Mean Test_PR_AUC   : 0.3916 +/- 0.1517
+  Mean Test_ROC_AUC  : 0.7770 +/- 0.0962
+This view exists ONLY to quantify how much a single hard subject moves the
+mean. It is NOT a substitute baseline and must not be cited on its own in
+any headline claim -- always report View A (with S08) as the primary
+number, and View B alongside it as context if S08's impact is discussed.
+
+How much S08 alone moves each mean (View A minus View B)
+----------------------------------------------------------------------
+  Test_F1     : 0.2949 - 0.3370 = -0.0421  (S08 pulls the mean F1 down by ~0.042, ~12% relative)
+  Test_PR_AUC : 0.3719 - 0.3916 = -0.0197  (S08 pulls the mean PR-AUC down by ~0.020, ~5% relative)
+  Test_ROC_AUC: 0.7249 - 0.7770 = -0.0521  (S08 pulls the mean ROC-AUC down by ~0.052, ~7% relative)
+
+Interpretation: S08's single below-chance fold (Test_F1=0.0, Test_ROC_AUC=0.36)
+is enough to shift the 8-fold mean ROC-AUC down by ~5 points and the mean F1
+down by ~4 points, and to noticeably widen the std (F1 std 0.206 vs 0.182,
+ROC-AUC std 0.172 vs 0.096). This is expected and mechanical given n=8 -- one
+outlier fold has a large per-fold weight -- not evidence that S08 should be
+dropped. Diagnosis (docs/case_study_S08.md, results/reports/diag_S08_report.txt)
+found no data defect; S08 reflects a genuine akinetic-freezing phenotype the
+model does not generalize to. Official baseline = View A.
