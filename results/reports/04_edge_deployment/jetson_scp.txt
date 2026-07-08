@@ -1,0 +1,72 @@
+Jetson Orin NX file transfer -- fog_edge deployment bundle
+======================================================================
+date         : 2026-07-05
+host         : WSL desktop (100.98.212.82) -> Jetson Orin NX SUPER (100.97.43.118)
+jetson user  : stu
+jetson dir   : ~/fog_edge/{artifacts,scripts,models,logs}
+transport    : scp, one file at a time (no bulk/recursive copy)
+auth         : SSH public-key (WSL key andy0704-nrp-wsl2-desktop authorized on
+               Jetson mid-task after an initial password-auth block; see note below)
+
+NOTE ON AUTH: the first connection attempt failed -- SSH tried the local
+WSL public key (not yet authorized on the Jetson) then fell back to password
+auth, which this non-interactive shell has no way to satisfy (no TTY/askpass
+available). Work paused; the WSL public key
+(ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJKuO0J7/Q09bxRL753PQ7WJvRvt+QzRsPwu/IWotpSt
+andy0704-nrp-wsl2-desktop) was printed for you to hand to the Jetson operator.
+Once authorized, `ssh stu@100.97.43.118 "echo pubkey_auth_ok"` succeeded with
+no password prompt, and the transfer proceeded as planned below.
+
+----------------------------------------------------------------------
+FILE VERIFICATION TABLE (all 10 files, byte-exact match)
+----------------------------------------------------------------------
+# | src path                                                    | src bytes | dst path                          | dst bytes | match
+1 | edge/artifacts/fog_tcn.onnx                                 | 703143    | ~/fog_edge/artifacts/fog_tcn.onnx | 703143    | YES
+2 | edge/model_utils.py                                         | 4432      | ~/fog_edge/scripts/model_utils.py | 4432      | YES
+3 | edge/stream_infer.py                                        | 15131     | ~/fog_edge/scripts/stream_infer.py| 15131     | YES
+4 | edge/ras_cue.py                                             | 5750      | ~/fog_edge/scripts/ras_cue.py     | 5750      | YES
+5 | edge/latency_harness.py                                     | 6803      | ~/fog_edge/scripts/latency_harness.py | 6803  | YES
+6 | edge/export_onnx.py                                         | 5488      | ~/fog_edge/scripts/export_onnx.py | 5488      | YES
+7 | src/basic_tcn.py                                            | 3507      | ~/fog_edge/scripts/basic_tcn.py   | 3507      | YES
+8 | src/fog_preprocessing.py                                    | 6235      | ~/fog_edge/scripts/fog_preprocessing.py | 6235 | YES
+9 | data/dataset/S01R01.txt                                     | 7082363   | ~/fog_edge/artifacts/S01R01.txt   | 7082363   | YES
+10| results/RUN_20260703_173337/models/best_model_S01.pth       | 719614    | ~/fog_edge/models/best_model_S01.pth | 719614 | YES
+
+All 10/10 files transferred, sizes byte-exact on both sides. No file
+substituted; no directory bulk-copied (each scp invoked individually).
+
+----------------------------------------------------------------------
+PATH RESOLUTION NOTE (file #10)
+----------------------------------------------------------------------
+Checkpoint filename convention was confirmed by listing the source directory
+before transfer: results/RUN_20260703_173337/models/ contains
+best_model_{S01,S02,S03,S05,S06,S07,S08,S09}.pth (one per LOSO outer fold).
+The stated path best_model_S01.pth existed exactly as given -- no
+substitution or guessing needed; no alternate naming (e.g. "best_model_fold_
+S01.pth") was present.
+
+----------------------------------------------------------------------
+JETSON-SIDE SUMMARY (as requested, one-line command output)
+----------------------------------------------------------------------
+$ ssh stu@100.97.43.118 "du -sh ~/fog_edge/ && ls -la ~/fog_edge/artifacts/ ~/fog_edge/scripts/ ~/fog_edge/models/"
+
+8.2M    /home/stu/fog_edge/
+artifacts/: fog_tcn.onnx (703143 bytes), S01R01.txt (7082363 bytes)
+scripts/: basic_tcn.py, export_onnx.py, fog_preprocessing.py,
+          latency_harness.py, model_utils.py, ras_cue.py, stream_infer.py
+models/: best_model_S01.pth (719614 bytes)
+(models/, artifacts/, scripts/ each contain exactly the files transferred
+above and nothing else; logs/ remains empty as before, untouched.)
+
+----------------------------------------------------------------------
+HOST-SIDE INTEGRITY CHECK
+----------------------------------------------------------------------
+git status --short -- data/ src/   -> no output (no modifications)
+git status --short -- edge/        -> "?? edge/" (pre-existing untracked
+  directory from earlier work, not created or modified by this transfer
+  task; scp only reads local files)
+No file in data/, src/, results/, or edge/ beyond the 10 listed was read,
+moved, or modified. Nothing was committed.
+
+Total transferred: ~8.2 MB (within the expected ~10-20 MB range; no single
+file exceeded the 50 MB threshold -- largest was S01R01.txt at 6.8 MB).

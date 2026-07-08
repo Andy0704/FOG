@@ -1,0 +1,103 @@
+Jetson Orin NX -- TensorRT engine build (FP32 + FP16) from fog_tcn.onnx
+======================================================================
+date       : 2026-07-05
+target     : Jetson Orin NX SUPER, stu@100.97.43.118 (SSH key auth)
+tool       : /usr/src/tensorrt/bin/trtexec (TensorRT v100300, JetPack-shipped)
+model      : fog_tcn.onnx (DETECTION architecture exported from the
+             PREDICTION checkpoint per ADR-016), opset 17, sigmoid baked in
+input      : fixed shape [1, 3, 64] (batch=1, 3 accel channels, 64-sample window)
+note       : trtexec's own internal throughput/queries-per-second benchmark
+             ONLY (Task 4 ONNX-vs-TRT numerical check and Task 5 latency
+             harness are separate, not run here).
+
+----------------------------------------------------------------------
+1. ONNX INTEGRITY CHECK (host vs Jetson)
+----------------------------------------------------------------------
+  host   md5: 30deee11f09f6fe1b7ae167aeb9b6cce  edge/artifacts/fog_tcn.onnx
+  jetson md5: 30deee11f09f6fe1b7ae167aeb9b6cce  ~/fog_edge/artifacts/fog_tcn.onnx
+  match: YES -- transfer intact, no corruption.
+
+----------------------------------------------------------------------
+2. ENGINE FILE SIZES
+----------------------------------------------------------------------
+  fog_tcn_fp32.engine : 922228 bytes (901 KiB)
+  fog_tcn_fp16.engine : 653404 bytes (639 KiB)
+  ratio (fp16/fp32)   : 0.71  (NOT ~0.5 as commonly expected for a fully
+                        FP16 engine -- see note in section 4: trtexec
+                        reports "Precision: FP32+FP16", i.e. a MIXED-
+                        precision engine, not a pure-FP16 one. A
+                        meaningful fraction of weights/kernels stayed FP32.)
+
+Both engine files exist on Jetson with non-zero size. Both trtexec runs
+ended with "&&&& PASSED" (no ERROR in either log).
+
+----------------------------------------------------------------------
+3. PERFORMANCE TABLE (trtexec --verbose "Performance summary" section)
+----------------------------------------------------------------------
+precision | GPU Compute median (ms) | GPU Compute mean (ms) | Throughput (qps)
+FP32      | 0.307373                | 0.307366               | 3203.24
+FP16      | 0.311768                | 0.316306               | 3070.60
+
+FP16 speedup vs FP32 (median): 0.307373 / 0.311768 = 0.986x -- i.e. FP16 is
+about 1.4% SLOWER than FP32 on this model, not faster.
+FP16 speedup vs FP32 (mean):   0.307366 / 0.316306 = 0.972x -- about 2.8%
+slower by the mean.
+
+----------------------------------------------------------------------
+4. FLAG: FP16 speedup < 1.5x (in fact <1.0x -- no speedup at all)
+----------------------------------------------------------------------
+This model is extremely small (TCN with 32/64/128 channels, kernel size
+<=5, window=64, batch=1) -- both FP32 and FP16 GPU Compute times land in
+the same ~0.30-0.32 ms band, and total inference work per query is tiny
+relative to fixed per-kernel launch overhead. Evidence this is a "too
+small to benefit from FP16" situation rather than an unsupported-op
+fallback:
+  - trtexec reports "Precision: FP32+FP16" for the --fp16 build, i.e. it
+    was ALLOWED to use FP16 kernels wherever beneficial, and its own
+    autotuner (profiled per-tactic during the build, verbose log) still
+    picked FP32-named conv tactics as fastest/competitive for these tiny
+    channel counts -- not a case of an op TensorRT refuses to run in FP16.
+  - Input/output tensor format is reported as "fp32:CHW" for both builds
+    (expected: the ONNX graph's I/O dtype is float32 and no
+    --inputIOFormats/--outputIOFormats=fp16 flag was passed in this task's
+    trtexec commands, so I/O casts were never requested either way).
+  - The 71% (not ~50%) engine-size ratio confirms a real mix of FP32 and
+    FP16 weights, not a pure-FP16 engine that simply failed to speed up.
+Conclusion: this is consistent with kernel-launch-overhead-bound latency
+on a very small network, not a BatchNorm/op-specific FP16 incompatibility.
+No corrective action taken in this task (Task 3 is build-only); worth
+revisiting in Task 5's latency harness with repeated/batched queries to
+see if the picture changes under sustained load, and worth noting for the
+write-up that "FP16 is not automatically a win for very small edge models."
+
+----------------------------------------------------------------------
+5. WARNINGS (from both logs, brief)
+----------------------------------------------------------------------
+FP32 log (2 warnings, both informational/perf-tuning, not correctness):
+  - Throughput may be bound by Enqueue Time rather than GPU Compute (GPU
+    may be under-utilized); suggests --useCudaGraph.
+FP16 log (4 warnings: the same 2 above, plus 2 more):
+  - Throughput may be bound by Enqueue Time rather than GPU Compute; same
+    --useCudaGraph suggestion.
+  - GPU compute time is unstable, coefficient of variance = 8.03%; suggests
+    locking GPU clock frequency or --useSpinWait for more stable timing.
+No WARNING in either log concerns unsupported layers, precision fallback,
+or correctness -- only performance-tuning suggestions from trtexec itself.
+
+----------------------------------------------------------------------
+ACCEPTANCE CHECK
+----------------------------------------------------------------------
+[x] Both .engine files exist on Jetson with non-zero size.
+[x] Both trtexec runs completed without ERROR ("&&&& PASSED" in both logs).
+[x] ONNX md5 matches between host and Jetson.
+[x] GPU Compute Time reported for both engines (see table above).
+
+FP16 speedup vs FP32: 0.97x (median 0.99x) -- FLAGGED: below the 1.5x
+threshold, in fact no speedup at all. Root cause here looks like the model
+being too small to be compute-bound rather than a specific op falling back
+to FP32 -- see section 4 for the evidence trail.
+
+STOPPING per instructions -- not proceeding to Task 4 (ONNX-vs-TRT
+numerical verification) or Task 5 (latency harness). Full trtexec logs
+remain on Jetson at ~/fog_edge/logs/trtexec_fp32.log and
+~/fog_edge/logs/trtexec_fp16.log for reference.

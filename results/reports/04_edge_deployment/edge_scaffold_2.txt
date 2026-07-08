@@ -1,0 +1,148 @@
+FoG TCN -- Edge deployment scaffold, part 2: ONNX unblocked + decoupled
+inference cadence (ADR-016/017)
+======================================================================
+date       : 2026-07-03
+task       : PREDICTION (horizon=64 samples=1.0s pre-FoG onset, ADR-014) --
+             NOT detection.
+environment : WSL, fog_env_wsl venv, PYTHONUTF8=1. GPU = NVIDIA RTX 4060.
+             NO physical IMU sensor -- streaming is simulated by replaying
+             data/dataset/S01R01.txt sample-by-sample.
+deployment checkpoint : results/RUN_20260703_173337/models/best_model_S01.pth
+             (S01-fold, held out during training -- see edge/model_utils.py
+             / ADR-016 for why).
+confirmed  : NO changes to src/ or data/ this task. edge/ only (plus
+             requirements.txt for the two new pip packages).
+
+----------------------------------------------------------------------
+A. ONNX EXPORT -- UNBLOCKED, PASSED
+----------------------------------------------------------------------
+Installed (not silently -- reported here, added to requirements.txt):
+  onnx==1.22.0
+  onnxruntime==1.27.0
+
+Ran: python edge/export_onnx.py
+  [RF] 57 (<= 64)
+  saved: edge/artifacts/fog_tcn.onnx (opset=17, fixed input shape [1, 3, 64],
+         sigmoid baked in via SigmoidWrapper)
+  validated 100 real scaled S01 windows (subject=S01) via onnxruntime CPU EP
+
+  PyTorch vs onnxruntime max abs diff = 1.192e-07
+
+PARITY CHECK: PASSED (threshold 1e-4; actual value is ~840x smaller than the
+threshold). No tolerance loosening needed or performed.
+
+----------------------------------------------------------------------
+B. DECOUPLED INFERENCE CADENCE (ADR-017) -- infer_step SWEEP
+----------------------------------------------------------------------
+edge/stream_infer.py gained --infer_step (default 8), independent of the
+training stride STEP_SIZE=32 (still used only by the training pipeline in
+src/). The 64-sample causal window and model weights are unchanged; only
+how often a forward pass fires changes. Training data/labels untouched --
+this only affects the DEPLOYED replay script.
+
+Replay: data/dataset/S01R01.txt (92802 raw samples, 18 onsets), same
+checkpoint/threshold as part A, causal post-proc (median k=5 +
+majority_vote w=7, reused unchanged from src/run_loso.py) for all three
+settings.
+
+infer_step | decision_interval_ms | n_fwd_passes | cue_triggers | sanity_recall | mean_lead_time_s
+-----------|----------------------|--------------|--------------|----------------|------------------
+32         | 500.00               | 2899         | 58           | 0.7222 (13/18) | 0.6899
+16         | 250.00               | 5797         | 82           | 0.8333 (15/18) | 0.8760
+8          | 125.00               | 11593        | 226          | 1.0000 (18/18) | 0.8490
+
+Effective causal post-proc span in ms (HONEST accounting -- k=5/w=7 count
+DECISION steps, not raw samples, so their real-time reach SHRINKS as
+infer_step shrinks):
+
+infer_step | decision_interval_ms | median(k=5)_span_ms | majority_vote(w=7)_span_ms | combined_worst_case_ms
+-----------|----------------------|----------------------|------------------------------|-------------------------
+32         | 500.00               | 2500.00              | 3500.00                      | 5500.00
+16         | 250.00               | 1250.00              | 1750.00                      | 2750.00
+8          | 125.00               | 625.00               | 875.00                       | 1375.00
+
+DOES SMALLER infer_step IMPROVE LEAD TIME / RECALL ON THIS REPLAY? YES,
+clearly, on both:
+  - sanity_recall:     0.7222 -> 0.8333 -> 1.0000  (monotonic improvement)
+  - mean_lead_time_s:  0.6899 -> 0.8760 -> 0.8490  (large improvement from
+                        32->16; a small, non-monotonic dip from 16->8, still
+                        far above the infer_step=32 baseline)
+
+BUT this comes with a real, honestly-reported cost: cue_triggers rises
+sharply (58 -> 82 -> 226) as infer_step shrinks. Part of this is genuinely
+"catching more onsets, correctly" (recall going to 18/18), but part of it
+is the causal post-proc's smoothing/debounce window shrinking in real time
+(combined span 5500ms -> 1375ms at k=5/w=7 fixed) -- the same k/w values
+smooth over much less real-world history at infer_step=8, so the binary cue
+signal is structurally chattier (more separate on/off blips) even where the
+underlying onset count (18) hasn't changed. This is NOT a bug -- it is the
+direct, expected consequence of decoupling infer_step from the (k=5, w=7)
+post-proc that was originally tuned around STEP_SIZE=32's smoothing span --
+flagged explicitly for follow-up in section D below rather than silently
+picking infer_step=8 as a free win.
+
+----------------------------------------------------------------------
+C. LATENCY -- FORWARD (MEASURED) vs DECISION INTERVAL (STRUCTURAL),
+   REPORTED SEPARATELY, NOT MERGED
+----------------------------------------------------------------------
+*** WSL/RTX4060 BASELINE NUMBERS. NOT JETSON FIGURES. Same harness reruns
+unchanged on Jetson tomorrow. ***
+
+edge/latency_harness.py now sweeps the same infer_step values and reports
+forward compute time (measured) and decision_interval (structural) as two
+SEPARATE numbers -- never summed into one "end_to_end" figure that would
+hide which part is actual compute vs which part is a config choice.
+
+device=cuda (RTX 4060), n_steps ~2879-11573 (20 warmup iters dropped/setting):
+
+infer_step | forward_mean_ms | forward_median_ms | forward_p95_ms | decision_interval_ms (structural)
+-----------|------------------|---------------------|-----------------|-------------------------------------
+32         | 1.6615           | 1.4006              | 3.3503          | 500.0000
+16         | 1.6261           | 1.4019              | 3.3265          | 250.0000
+8          | 1.6655           | 1.4185              | 3.3758          | 125.0000
+
+device=cpu, same replay:
+
+infer_step | forward_mean_ms | forward_median_ms | forward_p95_ms | decision_interval_ms (structural)
+-----------|------------------|---------------------|-----------------|-------------------------------------
+32         | 1.2728           | 1.2037              | 2.2601          | 500.0000
+16         | 1.2100           | 1.1843              | 2.0263          | 250.0000
+8          | 1.2410           | 1.2057              | 2.1054          | 125.0000
+
+Forward compute time is EMPIRICALLY FLAT across infer_step (as expected --
+a single forward pass costs the same regardless of how often it's called;
+the ~0.02-0.04ms variation across settings is measurement noise, not a
+real effect). What actually changes with infer_step is the structural
+decision_interval, which the table keeps as a visibly separate column
+rather than folding it into the compute number. CPU is again marginally
+faster than GPU here (same finding as edge_scaffold.txt part 1) -- expected
+for a model this small at batch_size=1, where GPU kernel-launch overhead
+dominates actual compute.
+
+----------------------------------------------------------------------
+D. BOTTOM LINE
+----------------------------------------------------------------------
+- ONNX export UNBLOCKED and PASSED: max abs diff = 1.192e-07 (<< 1e-4).
+  onnx==1.22.0 and onnxruntime==1.27.0 installed and added to
+  requirements.txt.
+- infer_step is now decoupled from the training stride STEP_SIZE=32 (which
+  remains untouched in src/ and in the training pipeline). Shrinking
+  infer_step 32->16->8 clearly improves the streaming replay's sanity
+  recall (0.7222->0.8333->1.0000) and mean lead time (0.69s->0.88s->0.85s),
+  at the cost of ~4x more forward passes (still cheap, ~1.2-1.7ms each,
+  same order as before) and a much chattier cue signal (58->82->226
+  trigger events) because the SAME k=5/w=7 post-proc window now spans much
+  less real time (5500ms->1375ms combined). RECOMMENDATION FOR TOMORROW: do
+  not just adopt infer_step=8 as a free win -- either re-tune k/w for the
+  new decision cadence (e.g. scale k/w up so the real-time smoothing span
+  stays roughly constant across infer_step) or add an explicit refractory/
+  debounce period in edge/ras_cue.py before committing to a final
+  infer_step for the live demo. This is a genuine, not-yet-resolved
+  tradeoff -- flagged, not silently decided.
+- Latency harness now reports forward (measured, ~1.2-1.7ms, essentially
+  infer_step-independent) and decision_interval (structural,
+  infer_step-dependent: 500/250/125ms) as two SEPARATE numbers, never
+  merged -- the earlier edge_scaffold.txt's "end_to_end" framing is
+  superseded by this clearer separation (see DECISIONS.md ADR-017).
+- No changes to src/ or data/; all work stayed within edge/ (plus the two
+  new lines in requirements.txt).

@@ -1,0 +1,185 @@
+FoG TCN -- Edge deployment scaffold, part 3: span-constant post-proc +
+refractory debounce (ADR-017 resolution)
+======================================================================
+date       : 2026-07-04
+task       : PREDICTION (horizon=64 samples=1.0s pre-FoG onset, ADR-014) --
+             NOT detection.
+environment : WSL, fog_env_wsl venv, PYTHONUTF8=1. GPU = NVIDIA RTX 4060.
+             NO physical IMU sensor -- streaming is simulated by replaying
+             data/dataset/S01R01.txt sample-by-sample.
+deployment checkpoint : results/RUN_20260703_173337/models/best_model_S01.pth
+             (S01-fold, held out during training). Same checkpoint/threshold
+             (0.176353) as edge_scaffold.txt / edge_scaffold_2.txt.
+confirmed  : NO changes to src/ or data/ this task. edge/ only
+             (edge/stream_infer.py, edge/ras_cue.py modified; edge/
+             model_utils.py, edge/export_onnx.py, edge/latency_harness.py
+             untouched).
+
+----------------------------------------------------------------------
+1. WHAT CHANGED
+----------------------------------------------------------------------
+edge/stream_infer.py: added derive_kw(infer_step, median_span_ms=800,
+majority_span_ms=1000) -- k/w are now DERIVED per infer_step so
+causal_median(k)/causal_majority_vote(w)'s REAL-TIME span stays close to
+the target spans instead of shrinking as infer_step shrinks (the cause of
+edge_scaffold_2.txt's cue-trigger explosion, 58->226). Explicit --k/--w
+still override the derivation if needed (e.g. to reproduce the old fixed
+k=5/w=7 behavior).
+
+edge/ras_cue.py: RASCueEngine gained refractory_ms (default 2000ms) --
+after a cue event fires, any rising edge within refractory_ms is suppressed
+(counted, not emitted as a new event). edge/stream_infer.py now reuses
+RASCueEngine UNCHANGED to compute the WITH-refractory trigger count
+alongside the raw rising-edge count.
+
+Both causal_median/causal_majority_vote themselves are still the EXACT
+SAME functions from src/run_loso.py, reused unchanged -- only k/w (which
+were always caller-supplied parameters) are now computed differently.
+
+----------------------------------------------------------------------
+2. SPAN-CONSTANT SWEEP (infer_step in {32, 16, 8})
+----------------------------------------------------------------------
+Target spans: median_span_ms=800, majority_span_ms=1000 (defaults, per
+instructions -- roughly the old STEP_SIZE=32 baseline's PER-WINDOW reach,
+not its inflated 5500ms COMBINED span from edge_scaffold_2.txt).
+
+infer_step | decision_interval_ms | derived_k | derived_w | median_span_ms (actual) | majority_span_ms (actual)
+-----------|----------------------|-----------|-----------|---------------------------|-----------------------------
+32         | 500.00               | 2         | 2         | 1000.00                   | 1000.00
+16         | 250.00               | 3         | 4         | 750.00                    | 1000.00
+8          | 125.00               | 6         | 8         | 750.00                    | 1000.00
+
+majority_span_ms lands EXACTLY on the 1000ms target every time (1000 is
+evenly divisible by 500/250/125). median_span_ms lands on 1000/750/750ms
+against an 800ms target -- close but not exact, an honest consequence of
+k needing to be a whole number of decision steps at each infer_step's
+discrete granularity (round(800/500)=2 -> 1000ms is the nearest achievable
+value at infer_step=32's coarse 500ms decision interval). Combined
+worst-case lookback (k+w-1 decision steps) is 1500/1500/1625ms -- much more
+STABLE across infer_step than edge_scaffold_2.txt's fixed-k/w 5500/2750/
+1375ms (a ~4x spread there vs ~1.08x here).
+
+infer_step | decision_interval_ms | cue_triggers_RAW | sanity_recall | mean_lead_time_s
+-----------|----------------------|--------------------|-----------------|-------------------
+32         | 500.00               | 122                | 1.0000 (18/18)  | 0.7240
+16         | 250.00               | 125                | 1.0000 (18/18)  | 0.8351
+8          | 125.00               | 134                | 0.9444 (17/18)  | 0.8667
+
+----------------------------------------------------------------------
+3. THE KEY QUESTION: DOES SMALLER infer_step STILL HELP ONCE SPAN IS
+   HELD CONSTANT?
+----------------------------------------------------------------------
+TRIGGER-COUNT EXPLOSION: YES, IT GOES AWAY. Raw trigger count now ranges
+122-134 across the full infer_step sweep (a 1.10x spread) versus
+edge_scaffold_2.txt's fixed-k/w sweep, which ranged 58-226 (a 3.90x
+spread). This directly confirms span-constant post-proc controls cue
+chatter as intended.
+
+RECALL: NO, IT DOES NOT KEEP IMPROVING -- it is already at CEILING (18/18)
+at infer_step=32 once span is held constant, stays at ceiling at
+infer_step=16, and actually dips slightly to 17/18 at infer_step=8 (one
+onset flips from hit to miss; with only 18 total onsets this single flip
+is within plausible sampling noise, not a clear trend). This is a
+materially different picture from edge_scaffold_2.txt's fixed-k/w sweep,
+where recall rose monotonically 0.7222->0.8333->1.0000 as infer_step
+shrank. Comparing the two sweeps side by side reveals WHY: fixed-k=5/w=7
+at infer_step=32 produced a 5500ms combined smoothing span -- so long it
+was likely OVER-SMOOTHING and diluting real onset signal; shrinking
+infer_step under that fixed-k/w regime incidentally shrank the span back
+toward a more reasonable range, and MOST of the earlier "smaller infer_step
+helps recall" trend was probably this de-dilution effect, not a genuine
+cadence benefit. Once span is explicitly held ~constant (not shrinking as
+a side effect), recall is already saturated at the largest infer_step
+tested.
+
+LEAD TIME: YES, a real (if modest) cadence benefit remains -- mean lead
+time improves 0.7240s -> 0.8351s -> 0.8667s as infer_step shrinks, even
+with span held constant. This makes intuitive sense: finer decision cadence
+lets the system register a threshold-crossing closer to the moment it
+actually happens, rather than waiting up to decision_interval_ms extra
+before the next opportunity to decide -- a genuine, not-confounded cadence
+effect, distinct from the (now resolved) smoothing-span story.
+
+BOTTOM LINE ON THE KEY QUESTION: the trigger-count explosion is fixed.
+Recall gains from smaller infer_step were substantially a smoothing-span
+artifact, not a real cadence effect -- once controlled for, recall doesn't
+keep improving. Lead time IS a genuine, if modest, cadence benefit.
+
+----------------------------------------------------------------------
+4. REFRACTORY / DEBOUNCE EFFECT (refractory_ms=2000, default)
+----------------------------------------------------------------------
+infer_step | cue_triggers_RAW | cue_triggers_WITH_refractory | n_suppressed | pct_suppressed
+-----------|--------------------|---------------------------------|-----------------|------------------
+32         | 122                | 117                              | 5               | 4.1%
+16         | 125                | 112                              | 13              | 10.4%
+8          | 134                | 123                              | 11              | 8.2%
+
+The refractory period trims RAW trigger counts by only ~4-10% -- a real
+but MODEST cleanup, not a fix for the underlying volume of triggers. HONEST
+FLAG: with only 18 true onsets in this replay but 112-123 triggers even
+after refractory, the large majority of triggers are NOT clustered tightly
+around the 18 known onsets (a 2000ms refractory would suppress rapid-fire
+bursts effectively if that's what was happening) -- they appear to be
+scattered elsewhere through the ~1450s replay, consistent with the
+window-level PR-AUC already being known to be low for this task
+(results/reports/baseline_prediction.txt: mean Test_PR_AUC=0.093+/-0.058).
+This is a PRECISION problem in the underlying probability stream, not
+something span-constant post-proc or refractory debounce can fully solve
+on their own -- flagged for follow-up (e.g. re-examine the frozen
+threshold=0.176353, or PROJECT_STATUS.md sec4 item 11's sparsity-driven
+tuning ideas), not silently smoothed over by this report.
+
+----------------------------------------------------------------------
+5. RECOMMENDATION FOR TOMORROW'S JETSON DEMO (FOR APPROVAL, NOT AUTO-COMMITTED)
+----------------------------------------------------------------------
+Recommended: infer_step=16, k=3, w=4 (derived, span-constant),
+refractory_ms=2000.
+
+Reasoning:
+  - infer_step=16 matches infer_step=32's ceiling recall (18/18) while
+    giving a meaningfully better mean lead time (0.8351s vs 0.7240s --
+    roughly 11% of the 1.00s horizon closer to the true onset), a real
+    cadence benefit per section 3.
+  - infer_step=8 does NOT clearly outperform infer_step=16: its recall is
+    actually slightly worse (17/18 vs 18/18, likely noise but not a
+    reason to prefer it) and its lead time gain over infer_step=16 is
+    small (0.8667s vs 0.8351s, +0.0316s) for roughly 2x the forward-pass
+    compute (11593 vs 5797 passes) and the highest raw trigger count
+    (134) of the three settings.
+  - infer_step=16's decision_interval (250ms) is still comfortably fast
+    for a cueing system, and forward compute cost is negligible either
+    way (~1.2-1.7ms/pass on WSL/RTX4060, see edge_scaffold_2.txt sec C;
+    Jetson TODO: confirm this holds on-device).
+  - refractory_ms=2000 (the specified default) is kept: it gives a modest,
+    real reduction in trigger count (10.4% at infer_step=16) with no
+    observed downside (it operates strictly on TIME between events, never
+    changes which onsets get caught -- recall/lead-time numbers above are
+    computed on the pre-refractory cue_binary stream, so refractory cannot
+    have hidden a recall cost).
+
+This does NOT resolve the section 4 precision flag (most triggers are not
+tied to the 18 known onsets) -- that is a separate, still-open issue for
+the model/threshold, not something infer_step/k/w/refractory_ms tuning can
+fix. Recommend surfacing that explicitly before/alongside the Jetson demo,
+not resolving it silently.
+
+----------------------------------------------------------------------
+6. BOTTOM LINE
+----------------------------------------------------------------------
+- Span-constant post-proc implemented in edge/stream_infer.py
+  (derive_kw()); derived (k,w) and real-time spans printed per infer_step,
+  approximately constant (majority_span exactly 1000ms every time; combined
+  worst-case span 1500/1500/1625ms, a 1.08x spread vs the old sweep's 4x).
+- Refractory/debounce added to edge/ras_cue.py's RASCueEngine
+  (refractory_ms, default 2000); reused (not reimplemented) by
+  edge/stream_infer.py to report WITH-refractory trigger counts alongside
+  raw counts.
+- Trigger-count explosion CONFIRMED FIXED (1.10x spread vs 3.90x before).
+  Recall does NOT keep improving with smaller infer_step once span is
+  held constant (it was mostly a smoothing-span artifact); lead time DOES
+  show a genuine, modest cadence benefit.
+- Recommendation: infer_step=16, k=3, w=4, refractory_ms=2000 -- for your
+  approval, not auto-committed as a new default anywhere in the code.
+- A real, separate precision concern (most triggers not tied to the 18
+  known onsets) is flagged, not silently resolved.
+- No changes to src/ or data/; all work stayed in edge/.

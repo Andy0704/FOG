@@ -1,0 +1,196 @@
+FoG TCN -- Edge deployment pipeline scaffold (hardware-independent parts)
+======================================================================
+date       : 2026-07-03
+task       : PREDICTION (horizon=64 samples=1.0s pre-FoG onset, ADR-014) --
+             NOT detection. All edge/ artifacts here target the PREDICTION
+             model.
+deployment checkpoint : results/RUN_20260703_173337/models/best_model_S01.pth
+             (S01-fold of the official PREDICTION baseline, ADR-014).
+             Trained on train_subjs=[S03,S05,S06,S07,S08,S09], val_subj=S02,
+             test_subj=S01 held out. Chosen (over e.g. the S03 fold's higher
+             raw ROC-AUC=0.8982) specifically so replaying S01 below is a
+             genuine HELD-OUT sanity check against the offline
+             episode_recall=0.7826 for S01, not an optimistic replay through
+             a model that already saw S01 in training. This is a LOSO-fold
+             checkpoint, not a final full-data deployment model -- see
+             DECISIONS.md ADR-016.
+environment : WSL, fog_env_wsl venv, PYTHONUTF8=1. GPU = NVIDIA RTX 4060
+             (cuda available). NO physical IMU sensor -- all "streaming" is
+             simulated by replaying a recorded Daphnet file sample-by-sample.
+new package : edge/ (was empty, now 5 files: model_utils.py [shared, not
+             independently requested], export_onnx.py, stream_infer.py,
+             ras_cue.py, latency_harness.py). Self-contained; imports
+             READ-ONLY from src/ (basic_tcn, fog_preprocessing, run_loso);
+             src/ training logic itself was NOT modified.
+confirmed  : NO changes to src/ or data/ this task. NO new results/RUN_*
+             directories created (edge/ writes only within edge/artifacts/,
+             which is currently empty -- see section 1).
+
+----------------------------------------------------------------------
+1. edge/export_onnx.py -- ONNX EXPORT: BLOCKED ON MISSING DEPENDENCY
+----------------------------------------------------------------------
+Ran: python edge/export_onnx.py
+Result: RF=57<=64 confirmed, checkpoint loaded correctly, model instantiated
+correctly -- then STOPPED at the torch.onnx.export() call itself:
+
+  OnnxExporterError: Module onnx is not installed!
+
+This is not just a validation-step gap -- fog_env_wsl is missing the `onnx`
+package outright, which torch.onnx.export() requires even to WRITE the
+.onnx file (confirmed by an isolated test before writing this script: a
+trivial nn.Module export fails with the identical error). onnxruntime
+(needed for the PyTorch-vs-ONNX parity check) is also not installed.
+
+Per instructions, NEITHER package was installed silently. Exact pip line
+needed before this step can run:
+
+  pip install onnx onnxruntime
+
+Once installed, `python edge/export_onnx.py` will: export BasicTCN (wrapped
+with a baked-in sigmoid so the ONNX graph outputs a probability directly) to
+edge/artifacts/fog_tcn.onnx at opset 17 (widely supported by TensorRT
+8.5+/JetPack 5.x-6.x) with a FIXED input shape [1, 3, 64], then validate it
+against 100 real (scaled) S01 windows through onnxruntime's CPU execution
+provider, asserting max abs diff < 1e-4 and reporting the exact value. The
+export + validation code is complete and ready to run -- this was not
+attempted or faked; it is a real, confirmed blocker, not a skipped step.
+
+ONNX max-diff: NOT YET MEASURED (blocked on the pip install above).
+
+----------------------------------------------------------------------
+2. edge/stream_infer.py -- RING-BUFFER STREAMING REPLAY: PASSED
+----------------------------------------------------------------------
+Ran: python edge/stream_infer.py  (replays data/dataset/S01R01.txt, one
+raw sample at a time, no future samples ever read -- CAUSAL by construction:
+the ring buffer only ever appends the current sample, forward passes only
+use the current + past 63 samples, and causal_median/causal_majority_vote
+are the exact SAME functions imported unchanged from src/run_loso.py, not
+reimplemented.)
+
+  n_raw_samples          = 92802
+  n_forward_passes       = 2899   (one every STEP_SIZE=32 samples once the
+                                    64-sample ring buffer fills)
+  frozen threshold        = 0.176353  (S01-fold val threshold, unchanged
+                                        from training)
+  causal post-proc        = median(k=5) + majority_vote(w=7), reused from
+                                        src/run_loso.py
+  cue trigger events (rising edges of the binary cue stream) = 58
+  onsets in this replay (S01R01.txt only)                    = 18
+  onsets preceded by >=1 cue within the 1.0s horizon         = 13/18
+  sanity recall                                              = 0.7222
+  mean lead time (hit onsets only)                           = 0.6899 s
+
+  Offline reference (RUN_20260703_173337, S01, held-out, BOTH S01 files
+  R01+R02, 23 onsets total): episode_recall=0.7826, mean_lead_time_s=0.6797
+
+sanity vs offline: 0.7222 vs 0.7826 recall, 0.6899s vs 0.6797s lead time --
+same ballpark, as expected for a CORRECTNESS check (this replays only
+S01R01.txt, not both S01 files the offline evaluation used, hence 18 onsets
+here vs 23 offline; and the streaming replay runs continuously through
+during-freeze periods too, unlike the offline evaluation which drops any
+window overlapping an excluded freeze period entirely, ADR-014). This is
+NOT a new metric and is not meant to reproduce the offline number exactly --
+it confirms the online ring-buffer + causal post-proc pipeline behaves
+sanely end-to-end, which it does.
+
+CAUSALITY CONFIRMED: the ring buffer (collections.deque(maxlen=64)) only
+ever receives the current sample via .append() inside the single forward
+iteration over X_scaled; window_end_idx for each forward pass equals the
+CURRENT raw sample index i (never i+k for k>0); causal_median/
+causal_majority_vote are pandas .rolling(...).min_periods=1 (past-only) --
+same functions, same call signature as src/run_loso.py's TEST-set evaluation.
+
+Integration check (edge/ras_cue.py consuming this stream's cue_binary via
+RASCueEngine.process_stream(cue_binary, sample_indices=window_end_idx)):
+58 events emitted, matching n_triggers=58 exactly. Event timestamps span
+60.5s to 1387.0s within the ~1450s (92802/64Hz) replay -- sane.
+
+----------------------------------------------------------------------
+3. edge/ras_cue.py -- RAS CUEING STUB: PASSED
+----------------------------------------------------------------------
+Standalone demo (python edge/ras_cue.py, synthetic binary stream): 2 cue
+events detected from 2 synthetic rising edges -- correct.
+
+Interface: CueStrategy (abstract base, one method `trigger(event) ->
+list[beep offsets]`). FixedTempoCueStrategy is the only implementation
+tonight (tempo_hz=1.8 placeholder ~108bpm, NOT tuned to any patient --
+config knob for later). AdaptivePhaseShiftCueStrategy is a documented stub
+(raises NotImplementedError) that will adjust tempo/phase to the patient's
+live gait cadence later, slotting into RASCueEngine via the same interface
+with no changes needed to RASCueEngine or stream_infer.py. No audio
+hardware -- "emit" means a logged event with a timestamp.
+
+Bug found and fixed during integration testing (documenting for the record,
+not swept under the rug): RASCueEngine originally derived event timestamps
+as `sample_index / fs_hz` from the cue_binary array's own index -- correct
+ONLY if cue_binary is raw-sample-indexed at fs_hz. stream_infer.py's
+cue_binary is actually WINDOW-indexed (one entry per STEP_SIZE=32 raw
+samples), so naive integration silently produced timestamps ~32x too small.
+Fixed by adding an optional `sample_indices` parameter to
+RASCueEngine.process_stream() so the true raw sample index is passed
+explicitly (stream_infer.py returns it as `window_end_idx`); documented in
+both files' docstrings. Verified fixed above (section 2, "Integration
+check").
+
+----------------------------------------------------------------------
+4. edge/latency_harness.py -- WSL-BASELINE LATENCY: PASSED (NOT JETSON)
+----------------------------------------------------------------------
+*** These are WSL/RTX4060 numbers. They are NOT the Jetson figures. The
+same harness (unchanged) runs on Jetson tomorrow for the real numbers. ***
+
+Measured over the same S01R01.txt replay (2879 steps after dropping 20
+warmup iterations to avoid cold-start/cuDNN-autotune skew):
+
+  device=cuda (RTX 4060):
+    forward:    mean=1.5614ms  median=1.3487ms  p95=3.2137ms
+    postproc:   500.0000ms  (STRUCTURAL constant = step_size/fs_hz =
+                              32/64s, NOT a measured compute time -- see
+                              caveat below)
+    end_to_end: mean=501.5614ms  median=501.3487ms  p95=503.2137ms
+
+  device=cpu:
+    forward:    mean=1.2011ms  median=1.1793ms  p95=1.9076ms
+    postproc:   500.0000ms  (same structural constant)
+    end_to_end: mean=501.2011ms  median=501.1793ms  p95=501.9076ms
+
+Note: CPU forward time is slightly LOWER than GPU here (1.20ms vs 1.56ms
+mean) -- expected for a model this small at batch_size=1; GPU kernel-launch
+overhead dominates over the actual compute for a 3-layer TCN at this scale.
+Whether Jetson's TensorRT-optimized engine changes this balance is exactly
+what tomorrow's on-device run will answer.
+
+CAVEAT on "postproc_wait_ms": this is reported as a fixed STRUCTURAL
+constant (step_size/fs_hz = 500ms), not something measured with a timer.
+In a real streaming deployment, a fresh 64-sample window is only ready once
+32 new IMU samples have physically arrived at 64Hz -- that is real wall-clock
+time the system must wait between decision points. A pre-recorded in-memory
+replay (tonight, no sensor) iterates through the array at CPU/array speed,
+not sensor speed, so time.perf_counter() around that loop would measure
+memory/array-indexing speed, not the real buffering wait -- reporting that
+as "measured post-proc latency" would be a fabricated number. Reporting the
+true structural constant instead is the honest choice; on Jetson with a
+REAL IMU streaming at fs_hz, this becomes a genuinely measurable wait with
+the same harness.
+
+----------------------------------------------------------------------
+5. BOTTOM LINE
+----------------------------------------------------------------------
+- 3 of 4 requested scripts (stream_infer.py, ras_cue.py, latency_harness.py)
+  ran end-to-end successfully on WSL with real (replayed) data and the
+  actual trained PREDICTION checkpoint. No src/ or data/ changes.
+- export_onnx.py is fully written and ready but genuinely BLOCKED on a
+  missing environment dependency (`onnx`, and separately `onnxruntime` for
+  validation) -- confirmed via an isolated test before writing the script,
+  not assumed. Fix: `pip install onnx onnxruntime`, then rerun
+  `python edge/export_onnx.py` to get the ONNX max-diff number.
+- A real integration bug (window-indexed vs sample-indexed cue timestamps
+  between stream_infer.py and ras_cue.py) was found and fixed during this
+  session's own smoke testing, not left for tomorrow to discover.
+- Causal post-processing confirmed (ring buffer is append-only /
+  past-samples-only; causal_median/causal_majority_vote reused unchanged
+  from src/run_loso.py; window_end_idx never references a future sample).
+- WSL-baseline latency: ~1.2-1.6ms forward (mean), ~500ms structural
+  post-proc wait, ~501-502ms end-to-end -- explicitly labeled as WSL, not
+  Jetson. Tomorrow's work: install onnx/onnxruntime -> rerun export_onnx.py
+  -> TensorRT engine conversion -> real IMU wiring -> rerun
+  latency_harness.py on-device for the real Jetson numbers.

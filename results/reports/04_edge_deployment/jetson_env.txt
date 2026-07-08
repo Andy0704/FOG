@@ -1,0 +1,92 @@
+Jetson Orin NX -- minimal Python inference environment setup (Task 3-6 prep)
+======================================================================
+date       : 2026-07-05
+target     : Jetson Orin NX SUPER, stu@100.97.43.118 (SSH key auth)
+scope      : NO PyTorch. TensorRT engine + onnxruntime CPU cross-check only.
+
+----------------------------------------------------------------------
+1. DIAGNOSTIC TABLE (before any install)
+----------------------------------------------------------------------
+item                    | result | version-or-error
+python3 --version       | PASS   | Python 3.10.12
+tensorrt (import)       | PASS   | 10.3.0 (already present, JetPack-shipped)
+numpy (import)          | PASS   | 1.21.5 (system/apt)
+pip3 --version          | PASS   | pip 22.0.2 (python 3.10)
+site.USER_SITE          | PASS   | /home/stu/.local/lib/python3.10/site-packages
+disk free (~ and /)     | PASS   | 427G free / 467G total (5% used), single mount
+onnxruntime (import)    | FAIL   | ModuleNotFoundError: No module named 'onnxruntime'
+                        |        | (checked before installing, not in the original
+                        |        | 5-item list, added since step B needed it)
+
+Since TensorRT and numpy were already present, steps A (apt install
+python3-libnvinfer) and C (apt install python3-numpy) were SKIPPED as
+unnecessary. Only onnxruntime needed installing (step B).
+
+----------------------------------------------------------------------
+2. INSTALL COMMANDS ACTUALLY RUN (verbatim, in order)
+----------------------------------------------------------------------
+(1) ssh stu@100.97.43.118 "pip3 install --user onnxruntime==1.18.0"
+    -> Successfully installed coloredlogs-15.0.1 flatbuffers-25.12.19
+       humanfriendly-10.0 numpy-2.2.6 onnxruntime-1.18.0
+    NOTE: pip resolved onnxruntime==1.18.0's "numpy>=1.21.6" requirement by
+    installing numpy 2.2.6 into the user site, which SHADOWED the working
+    system numpy 1.21.5. This broke onnxruntime's own compiled extension
+    (onnxruntime_pybind11_state), built against the numpy 1.x ABI --
+    ImportError: "AttributeError: _ARRAY_API not found" / numpy 2.x ABI
+    incompatibility. This is a well-known onnxruntime-1.18.0 + numpy-2.x
+    issue, not a version substitution on my part (onnxruntime==1.18.0 itself
+    installed exactly as specified).
+
+(2) ssh stu@100.97.43.118 "pip3 uninstall -y numpy"
+    -> Successfully uninstalled numpy-2.2.6
+    Removes ONLY the pip-installed numpy override; does not touch
+    onnxruntime or any other package. Run after explicit user approval
+    (this action was flagged by the permission system as a change to a
+    remote/shared device and required confirmation before proceeding).
+    Restores the system/apt numpy 1.21.5 (ABI-compatible with onnxruntime
+    1.18.0) as the resolved import.
+
+Steps NOT run (confirmed unnecessary or explicitly excluded):
+  - apt install python3-libnvinfer / python3-libnvinfer-dev (TensorRT already present)
+  - apt install python3-numpy (numpy already present via apt)
+  - pip install torch, tensorflow, onnxruntime-gpu (excluded by design)
+
+----------------------------------------------------------------------
+3. FINAL IMPORT VERIFICATION (verbatim output, after the numpy fix)
+----------------------------------------------------------------------
+$ ssh stu@100.97.43.118 'PYTHONUTF8=1 python3 <<PYEOF
+import sys, numpy, onnxruntime as ort, tensorrt as trt
+print("python:", sys.version.split()[0])
+print("numpy:", numpy.__version__)
+print("onnxruntime:", ort.__version__)
+print("onnxruntime providers:", ort.get_available_providers())
+print("tensorrt:", trt.__version__)
+print("all imports OK")
+PYEOF'
+
+python: 3.10.12
+numpy: 1.21.5
+onnxruntime: 1.18.0
+onnxruntime providers: ['AzureExecutionProvider', 'CPUExecutionProvider']
+tensorrt: 10.3.0
+all imports OK
+
+NOTE on providers: AzureExecutionProvider is onnxruntime's standard built-in
+provider (for Azure ML remote execution), present by default in most CPU
+wheels regardless of whether Azure is used -- not a GPU/CUDA provider. The
+task's expected-output example showed ['CPUExecutionProvider'] only; this
+extra entry is normal onnxruntime packaging, not evidence of a wrong wheel.
+CPUExecutionProvider is present, which is what Task 3-6 cross-checks need.
+
+----------------------------------------------------------------------
+ACCEPTANCE CHECK
+----------------------------------------------------------------------
+[x] All 4 imports (sys, numpy, onnxruntime, tensorrt) succeed.
+[x] TensorRT version is 10.x (10.3.0), matches the JetPack-shipped trtexec.
+[x] onnxruntime available at CPU (CPUExecutionProvider present).
+[x] No pip install of any GPU/CUDA-flavored package on aarch64 -- the
+    onnxruntime wheel installed was the standard aarch64 CPU wheel
+    (onnxruntime-1.18.0-cp310-cp310-manylinux_2_27_aarch64...), not
+    onnxruntime-gpu; no torch or tensorflow installed.
+
+Ready for Task 3 (trtexec ONNX->engine).

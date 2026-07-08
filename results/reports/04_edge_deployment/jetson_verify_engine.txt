@@ -1,0 +1,90 @@
+Jetson Orin NX -- ONNX vs TensorRT (FP32/FP16) numerical parity check
+======================================================================
+date       : 2026-07-05
+target     : Jetson Orin NX SUPER, stu@100.97.43.118 (SSH key auth)
+script     : ~/fog_edge/scripts/verify_engine.py (new, this task)
+chain      : PyTorch (host, training) -> ONNX (host, exported, verified in
+             WSL within 1.19e-07 of PyTorch, edge_scaffold_2) -> TensorRT
+             engine (Jetson, this check)
+input      : 100 REAL windows from artifacts/S01R01.txt, window_size=64,
+             step_size=32, 3 accel channels, float32, batch=1 per query
+             (fixed ONNX/engine input shape [1, 3, 64])
+
+----------------------------------------------------------------------
+1. ENVIRONMENT RECAP
+----------------------------------------------------------------------
+  onnxruntime : 1.18.0 (CPUExecutionProvider)
+  tensorrt    : 10.3.0
+  numpy       : 1.21.5 (system/apt -- unaffected by this task)
+  pandas      : 1.3.5 (already present, used to read S01R01.txt)
+  CUDA buffer library: ctypes.CDLL('libcudart.so') -- NOT pycuda, NOT
+    cuda-python. Chose this (option b) directly rather than trying
+    cuda-python first: sklearn and torch are intentionally NOT installed on
+    this Jetson (Task 2 decision), so introducing another pip package
+    risked repeating the numpy-ABI fight already fought once (Task 2);
+    ctypes+libcudart has zero pip dependencies. Inference uses TensorRT
+    10.3's modern tensor-address API (set_tensor_address +
+    execute_async_v3), confirmed present on this engine's Python bindings.
+
+Note: sklearn and torch are NOT installed on this Jetson (by design, Task
+2), so scripts/fog_preprocessing.py's FoGPreprocessor class (which imports
+both at module level) could not be used directly. verify_engine.py instead
+re-implements its two relevant methods in plain NumPy: StandardScaler's
+fit_transform (population-std z-score, ddof=0) and create_windows's
+any-overlap X windowing (task="detection" path, the default/unchanged one)
+-- same math, no torch/sklearn dependency. This is documented in the
+script's module docstring.
+
+----------------------------------------------------------------------
+2. RESULTS TABLE
+----------------------------------------------------------------------
+pair                    | max_abs_diff | mean_abs_diff | threshold | PASS/FAIL
+ort vs trt_fp32         | 3.506988e-05 | 1.237869e-05  | 1e-04     | PASS
+ort vs trt_fp16         | 2.080202e-04 | 7.046461e-05  | 1e-02     | PASS
+trt_fp32 vs trt_fp16    | 2.204925e-04 | 7.153258e-05  | n/a       | (info only)
+
+No threshold was loosened; both pairs pass at the thresholds specified in
+the task (1e-4 for FP32, 1e-2 for FP16), with substantial margin (FP32 is
+~2.85x under its threshold; FP16 is ~48x under its threshold).
+
+----------------------------------------------------------------------
+3. CONCLUSION
+----------------------------------------------------------------------
+Engines are numerically consistent with the source ONNX/PyTorch pipeline.
+
+Both the FP32 engine (the confirmed deployment target per the Task 3 build
+report, since FP16 showed no speedup on this model) and the FP16 engine
+(built regardless, informational) reproduce onnxruntime's output within a
+tight margin. The trt_fp32-vs-trt_fp16 gap (max 2.2e-04) is the same order
+of magnitude as the ort-vs-fp16 gap (max 2.08e-04), as expected -- FP16's
+error is dominated by its own reduced precision, not by any TensorRT-vs-ONNX
+graph-execution discrepancy.
+
+----------------------------------------------------------------------
+4. NOTES / MINOR ITEMS (non-blocking)
+----------------------------------------------------------------------
+- onnxruntime printed one benign startup message on every run:
+  "pthread_setaffinity_np failed for thread ... Invalid argument. Specify
+  the number of threads explicitly so the affinity is not set." This is a
+  known onnxruntime-on-ARM/Jetson CPU-affinity quirk (the CPU EP tries to
+  pin a thread to a specific core and the affinity mask isn't accepted on
+  this kernel config); it does not affect correctness or the results above
+  -- confirmed by running the script a second time to check exit code,
+  which returned 0 both times with identical PASS/PASS results.
+- Script exited 0 (success) on both runs.
+
+----------------------------------------------------------------------
+ACCEPTANCE CHECK
+----------------------------------------------------------------------
+[x] Script ran to completion without exception on Jetson (exit code 0).
+[x] FP32 engine passes the 1e-4 threshold vs ONNX (max_abs_diff=3.51e-05).
+[x] FP16 engine result reported: PASS at 1e-2 (informational; FP32 remains
+    the deployment target per Task 3's finding that FP16 shows no speedup
+    on this model).
+[x] No changes to data/ or host repo (all execution and the new script live
+    on Jetson at ~/fog_edge/scripts/verify_engine.py; this .txt report is
+    the only host-side file written).
+
+STOPPING per instructions -- not proceeding to Task 5 (latency harness).
+Full script + log remain on Jetson at ~/fog_edge/scripts/verify_engine.py
+and ~/fog_edge/logs/verify_engine.log.
