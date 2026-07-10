@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "scholar": {
+      "command": "npx",
+      "args": ["-y", "scholar-mcp", "--transport=stdio"],
+      "env": {
+        "SEMANTIC_SCHOLAR_API_KEY": "${SEMANTIC_SCHOLAR_API_KEY}",
+        "OPENALEX_MAILTO": "${OPENALEX_MAILTO}",
+        "CROSSREF_MAILTO": "${OPENALEX_MAILTO}"
+      }
+    },
+    "scipapers": {
+      "command": "npx",
+      "args": ["-y", "@futurelab-studio/latest-science-mcp@latest"],
+      "env": {
+        "OPENALEX_MAILTO": "${OPENALEX_MAILTO}",
+        "CORE_API_KEY": "${CORE_API_KEY}"
+      }
+    }
+  }
+}

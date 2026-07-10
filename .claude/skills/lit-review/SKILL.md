@@ -4,7 +4,7 @@ description: >
   Search academic literature for the FoG/IMU/TCN project and append curated,
   deduped entries to docs/literature/references.md. Use whenever the human asks
   to "find papers", "check the literature", "is there a better dataset", "what's
-  SOTA on X", or to back a DECISIONS.md ADR with citations. Uses the nrp-literature
+  SOTA on X", or to back a DECISIONS.md ADR with citations. Uses the scholar / scipapers
   MCP (Semantic Scholar + OpenAlex).
 ---
 
@@ -15,9 +15,12 @@ The human wants literature support: new datasets, baselines to beat, methodology
 precedent, or citations for an ADR / paper section.
 
 ## Tools
-- `nrp-literature:search_papers(query, limit, year_from, year_to)` — primary search.
-- `nrp-literature:get_paper_detail(doi_or_id)` — only when references/citations of a
-  specific paper are needed.
+- `mcp__scholar__search_literature_graph(query, limit, year_from, year_to)` — primary search.
+- `scholar:search_literature_graph(query="doi:<doi>")` — lightweight single-paper
+  metadata lookup (author, year, abstract, cites, venue). For deep per-paper
+  extraction (claims/methods/datasets/metrics), use the two-step path:
+  `scholar:ingest_paper_fulltext(doi_or_url)` then
+  `scholar:extract_granular_paper_details(document_id)`.
 - Do NOT use `export_to_references` (it writes to the unrelated NRP_Claude_Agent
   folder). Write to THIS repo's docs/literature/references.md instead.
 

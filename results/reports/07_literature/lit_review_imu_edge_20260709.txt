@@ -1,0 +1,350 @@
+FoG Edge Deployment Literature Review — Raw Report
+Repo: /mnt/c/Project/115Daphnet_FoG
+Run date: 2026-07-09
+Scope: literature discovery only. Zero writes to data/, src/, results/RUN_*/, or any
+training/logging path.
+
+=====================================================================
+SECTION 0 — PRE-CONDITION RESULTS
+=====================================================================
+PC-1 (env vars):
+  Command: python3 -c "import os; missing=[v for v in ['OPENALEX_MAILTO'] if not
+  os.environ.get(v)]; print('ENV_OK') if not missing else print('MISSING:',missing)"
+  Result: ENV_OK  -> PASS
+
+PC-2 (MCP connectivity):
+  Command: claude mcp list
+  Result:
+    scholar: npx -y scholar-mcp --transport=stdio - Connected
+    scipapers: npx -y @futurelab-studio/latest-science-mcp@latest - Connected
+  Both required servers [Connected] on first check (no approval prompt needed
+  this session). -> PASS
+
+PC-3 (reports subfolder):
+  Command: mkdir -p results/reports/07_literature
+  Result: directory created (was empty/absent before this run). -> PASS
+
+=====================================================================
+SECTION 1 — PART A: TOOL INVENTORY (verbatim)
+=====================================================================
+| server    | tool_name                          | purpose (1 phrase)                                   |
+|-----------|-------------------------------------|-------------------------------------------------------|
+| scholar   | search_google_scholar_key_words     | keyword search on Google Scholar, returns paper metadata |
+| scholar   | search_google_scholar_advanced      | filtered Google Scholar search (author/year/exact phrase/exclusions) |
+| scholar   | search_literature_graph             | federated search across OpenAlex/Crossref/Semantic Scholar/Scholar-scrape, canonicalized records |
+| scholar   | extract_granular_paper_details      | extract claims/methods/datasets/metrics from an already-ingested document_id |
+| scholar   | get_author_info                     | Google Scholar author profile + top publications |
+| scholar   | ingest_paper_fulltext                | resolve + ingest full-text PDF from DOI/URL/local path, parse via GROBID/simple |
+| scholar   | get_ingestion_status                 | poll status of an ingest_paper_fulltext job |
+| scholar   | suggest_contextual_citations         | recommend citations for a manuscript passage |
+| scholar   | validate_manuscript_citations        | validate inline citations against a supplied reference list |
+| scholar   | build_reference_list                 | generate CSL/BibTeX bibliography from works/manuscript |
+| scipapers | search_papers                        | search arXiv/OpenAlex/EuropePMC/CORE by title/abstract/author/fulltext |
+| scipapers | fetch_latest                         | fetch latest papers by source + category |
+| scipapers | fetch_top_cited                      | fetch top-cited papers by concept + since-date |
+| scipapers | fetch_content                        | fetch full content of a paper by source + paper_id |
+| scipapers | fetch_pdf_content                    | extract text from a direct PDF URL |
+| scipapers | list_categories                      | list valid categories per source |
+
+scholar tool count: 10 (>0, PASS)
+scipapers tool count: 6 (>0, PASS)
+-> proceed to Part B.
+
+=====================================================================
+SECTION 2 — PART B: SKILL.md DIFF
+=====================================================================
+File: .claude/skills/lit-review/SKILL.md
+grep "nrp-literature" found 3 lines pre-patch: 7, 18, 19.
+
+Line 7 (frontmatter description):
+  BEFORE: "...or to back a DECISIONS.md ADR with citations. Uses the nrp-literature
+            MCP (Semantic Scholar + OpenAlex)."
+  AFTER:  "...or to back a DECISIONS.md ADR with citations. Uses the scholar / scipapers
+            MCP (Semantic Scholar + OpenAlex)."
+  Mapping: frontmatter server name nrp-literature -> "scholar / scipapers" (per B2
+  explicit rule).
+
+Line 18 (primary search tool):
+  BEFORE: `nrp-literature:search_papers(query, limit, year_from, year_to)` — primary search.
+  AFTER:  `mcp__scholar__search_literature_graph(query, limit, year_from, year_to)` — primary search.
+  Mapping rationale: search_literature_graph is scholar's federated keyword-search
+  tool (query/limit/year_range params), closest functional match to the old
+  "search by keywords across a literature index" tool. Only the tool-name token
+  was replaced per the surgical str_replace instruction; the parameter list in
+  the doc line was left untouched (it now reads year_from/year_to which is an
+  approximation of the real tool's year_range shape — flagged, not corrected,
+  since correcting it would exceed the surgical string-replace scope given).
+
+Line 19 (single-paper detail lookup) — UNRESOLVED, left unpatched:
+  `nrp-literature:get_paper_detail(doi_or_id)` — only when references/citations of a
+  specific paper are needed.
+  No scholar tool performs a direct "fetch single paper metadata by DOI/ID" lookup.
+  The closest candidate, extract_granular_paper_details, requires a document_id
+  produced by a prior ingest_paper_fulltext job — it is not a drop-in replacement
+  for a DOI-keyed lookup and its purpose (claim/method/dataset extraction) differs
+  from simple metadata retrieval. Per the task's explicit instruction ("If a
+  nrp-literature tool name has NO obvious counterpart in A1/A2, STOP and flag in
+  the report instead of guessing"), this line was left unpatched rather than
+  guessed. See Section 5.
+
+Post-patch grep confirms exactly this state (line 7 and 18 changed, line 19
+still contains "nrp-literature").
+
+=====================================================================
+SECTION 3 — PER-QUERY RESULTS
+=====================================================================
+
+--- Query 1: IMU model, count, and body-placement for FoG edge deployment ---
+Candidates found: scholar (search_literature_graph) = 10 / scipapers
+(search_papers, source=openalex) = 10.  (20 raw, 1 title — Díaz et al. 2019 —
+returned by both tools.)
+
+After relevance filter: 4 kept, 16 discarded.
+  Kept (address FoG/PD + IMU placement/site comparison directly):
+    - O'Day et al. 2022 (single-ankle vs 3-IMU AUROC comparison)
+    - Bikias et al. 2021 DeepFoG (single wrist IMU FoG detection)
+    - Huang et al. 2023 (systematic review, FoG + fall wearables)
+    - Abbasi & Rezaee 2024 (ankle/leg/trunk channel-selection FoG detector)
+  Discarded (one-line reason each):
+    - Díaz et al. 2019 — general wearable-sensor review, not FoG/PD-specific.
+    - Hutabarat et al. 2021 — general gait-analysis review, not FoG/PD-specific.
+    - Bansal et al. 2023 — general FoG technique review, not placement-comparison focused.
+    - Çelik et al. 2021 — PD-population but general gait-event timing algorithm, not FoG.
+    - Rast & Labruyère 2020 — general mobility-impairment review, not PD/FoG.
+    - Park et al. 2021 — PD turning classification, not sensor-placement comparison.
+    - Hafer et al. 2023 — general lower-extremity biomechanics wearables review.
+    - Young et al. 2023 — general IoT gait-assessment review, not FoG/PD.
+    - Luo et al. 2020 — irregular-surface gait database, not FoG/PD.
+    - Takač et al. 2013 — positioning system paper, lacks quantitative site-AUC comparison.
+    - Liu et al. 2021 — general HMM gait-phase detection, not FoG.
+    - Muthukrishnan et al. 2020 — general PD rehab step-parameter system, not FoG-specific.
+    - Yeo & Park 2020 — general IMU spatio-temporal accuracy verification, not PD/FoG.
+    - Antonini et al. 2023 — general PD motor-symptom wearable (PDMonitor), not FoG-placement focused.
+    - Rupprechter et al. 2021 — computer-vision gait system, not wearable IMU.
+
+  Note: two additional relevant papers were surfaced serendipitously while
+  chasing Query 3 candidates through Google-Scholar-derived canonical lookups
+  (Delgado-Terán et al. 2025; Gregorčič & Georgiev 2025). Both address Query 1's
+  topic (single-ankle competitiveness; placement standardization) more precisely
+  than Query 3's, so they are reported and appended here rather than under
+  Query 3. See Section 5 for the process note.
+
+After de-dup vs references.md: 1 new (of the 4 originally-kept), 3 already
+present, +2 more new from the serendipitous find = 3 new total for Query 1.
+  Already present (DOIs match existing entries verbatim):
+    - 10.1186/s12984-022-00992-x (O'Day et al. 2022)
+    - 10.3389/frobt.2021.537384 (Bikias et al. 2021, DeepFoG)
+    - 10.3389/fnagi.2023.1119956 (Huang et al. 2023)
+  New (appended to references.md):
+    - Abbasi & Rezaee 2024 — DOI 10.1002/brb3.70206
+    - Delgado-Terán et al. 2025 — DOI 10.3390/s25061895
+    - Gregorčič & Georgiev 2025 — DOI 10.3390/s25165101
+
+New entries (references.md format):
+- **Abbasi & Rezaee 2024** — Deep Learning–Based Prediction of Freezing of Gait in
+  Parkinson's Disease With the Ensemble Channel Selection Approach. *Brain and
+  Behavior.* DOI: 10.1002/brb3.70206 · cites 12.
+  [METHOD] CBA-BiLSTM on ankle+leg+trunk sensors; ensemble channel selection +
+  attention mapping reduces to 2 channels at 99.88% accuracy, enabling real-time
+  monitoring. Alternative evidence (site *reduction via learning* vs. our fixed
+  single-ankle) for ADR-009. Causal post-processing not stated in abstract.
+- **Delgado-Terán et al. 2025** — Ankle Sensor-Based Detection of Freezing of Gait
+  in Parkinson's Disease in Semi-Free Living Environments. *Sensors.*
+  DOI: 10.3390/s25061895 · cites 10.
+  [DATASET][METHODOLOGY] Single-ankle IMU + CNN, 24 PD participants; AUROC 0.9596
+  (5Fold-CV) / 0.9275 (LOSO-CV) on walking+turning, dropping to 0.89/0.90 across
+  all activities in semi-free-living conditions. Real-world stress-test of the
+  single-ankle assumption (ADR-009) beyond lab-only O'Day 2022 evidence.
+- **Gregorčič & Georgiev 2025** — The Usefulness of Wearable Sensors for Detecting
+  Freezing of Gait in Parkinson's Disease: A Systematic Review. *Sensors.*
+  DOI: 10.3390/s25165101 · cites 3.
+  [REVIEW] 43 studies synthesized; accel+gyro most common combo (best config
+  ~100% sens/spec); waist/ankles/shanks/feet most common sites; no standardized
+  placement guideline; free-living validation flagged as the open gap. Directly
+  updates the Huang et al. 2023 review above with 2025 placement-standardization
+  status for ADR-009 framing.
+
+--- Query 2: Sampling-rate alignment between edge sensors and datasets ---
+Candidates found: scholar (search_literature_graph, 2 passes: primary keywords +
+Daphnet-specific follow-up) = 10 + 10 = 20 / scipapers (search_papers openalex +
+europepmc) = 10 + 0 = 10.  Total 30 raw candidates.
+
+After relevance filter: 0 kept, 30 discarded.
+  All 30 candidates were either (a) general human-activity-recognition / gait /
+  fall-detection / animal-accelerometer papers with no FoG or PD framing, or
+  (b) FoG/PD papers that do not address hardware-sampling-rate vs. model-input-rate
+  reconciliation, resampling method, or accuracy impact of frequency mismatch —
+  the specific topic of this query. No abstract across either search pass or
+  either provider clearly discusses resampling/downsampling methodology bridging
+  a wearable's native output rate and a trained model's expected input rate in a
+  FoG/PD/wearable-IMU context.
+  Closest near-miss (discarded, see Section 5 for detail): Lin & Grewal 2026,
+  "Deep Learning for FoG Detection: Cross-Dataset Validation Reveals Critical
+  Deployment Gaps..." (DOI 10.3390/s26041352) — addresses a lab-vs-daily-living
+  TCN generalization gap using datasets with different sensor configurations, but
+  does not discuss sampling-rate/resampling methodology specifically.
+
+After de-dup vs references.md: n/a (0 candidates survived the relevance filter).
+
+0 new entries for Query 2.
+
+--- Query 3: Window length and receptive-field trade-offs for causal streaming
+             inference on edge ---
+Candidates found: scholar (search_literature_graph primary pass = 10;
+search_google_scholar_advanced follow-up = 5; 4 targeted canonical-metadata
+lookups x top-3 each = 12, with overlap) / scipapers (search_papers openalex) = 10.
+Total unique candidates encountered: ~28 (after collapsing repeats across the
+follow-up canonical lookups).
+
+After relevance filter: 3 kept, ~25 discarded.
+  Kept (address FoG/PD real-time detection latency / edge-deployment trade-off):
+    - Koltermann et al. 2024 (Gait-Guard) — closed-loop real-time FoG intervention,
+      378.5 ms latency budget.
+    - Kita et al. 2017 — real-time wearable FoG detector, foundational
+      latency-constrained precedent.
+    - Al-Adhaileh et al. 2025b (Frontiers in Physiology) — quantized/pruned
+      CNN-BiLSTM+attention, edge inference <350 ms on RPi/Coral TPU.
+  Discarded (representative reasons; full candidate list omitted for brevity —
+  nearly all were off-topic hits from the broad keyword overlap with
+  "window"/"trade-off"/"latency" in unrelated domains):
+    - Filtjens et al. 2022 (MS-GCN) — offline motion-capture segmentation, not
+      causal/streaming windowed inference.
+    - Rekha, Shankar & Duraisamy 2025 — general LSTM FoG classifier, no
+      window-size/latency ablation reported.
+    - Song et al. 2025; Xu 2025; Ujjwal (thesis); Zhang & Ho 2025; He et al. 2023;
+      Tian 2025 — all off-topic (network coding, tourism forecasting, pedestrian
+      detection, pavement distress, ship motion, brain-tumor imaging — keyword
+      collision only on "window"/"trade-off"/"latency").
+    - Patel et al. 2021; Baker & Xiang 2023; Bian et al. 2025 (TinierHAR);
+      Tanaka 2025; Calderone et al. 2025; Li, Denison & Zhu 2024; Zanin et al.
+      2021; Ravichandran et al. 2026; Teikari & Pietrusz 2021 — general
+      wearable/edge-AI/HAR/neurodegeneration papers, not FoG-specific or not
+      addressing window-length/latency trade-offs.
+    - Casilari et al. 2015; Saad 2016 (thesis, French) — general fall-detection /
+      early FoG-detection background, no window/latency ablation.
+    - Mazilu et al. 2012 — influential (322 cites) early smartphone FoG latency
+      paper but pre-dates deep causal architectures; abstract snippet
+      insufficient to confirm a window-size figure — held out per quality bar,
+      see Section 5.
+    - "Fog-finder" (Koltermann et al. 2023, ACM UbiComp/ISWC) — Google Scholar
+      snippet is on-topic (low FoG detection latency on mobile hardware) but the
+      literature-graph tool could not resolve a canonical DOI record for it
+      (searches returned other papers instead); excluded rather than using an
+      inferred DOI. See Section 5.
+    - "Minimizing the Latency of Freezing of Gait Detection on Wearable Devices"
+      (Haddadi Esfahani et al. 2024, DOI 10.5162/iccc2024/2.2) — title is a very
+      close topical match but Crossref/OpenAlex/Google Scholar all returned a
+      null abstract; excluded per "never guess a citation's content" — see
+      Section 5.
+
+After de-dup vs references.md: 3 new, 0 already present.
+  New (appended to references.md):
+    - Koltermann et al. 2024 — DOI 10.1109/chase60773.2024.00016
+    - Kita et al. 2017 — DOI 10.1109/jsen.2017.2659780
+    - Al-Adhaileh et al. 2025b — DOI 10.3389/fphys.2025.1581699
+
+New entries (references.md format):
+- **Koltermann et al. 2024** — Gait-Guard: Turn-Aware Freezing of Gait Detection
+  for Non-Intrusive Intervention Systems. *2024 IEEE/ACM CHASE.*
+  DOI: 10.1109/chase60773.2024.00016 · cites 5.
+  [METHOD][DEPLOYMENT] Closed-loop real-time FoG detection + intervention; 378.5 ms
+  average intervention latency, 96.5% TP rate, subject-independent, 26 patients /
+  1591 events. Concrete end-to-end latency budget target for our Jetson streaming
+  path; causal by construction (closed-loop cueing requires past-only processing).
+- **Kita et al. 2017** — Reliable and Robust Detection of Freezing of Gait Episodes
+  With Wearable Electronic Devices. *IEEE Sensors Journal.*
+  DOI: 10.1109/jsen.2017.2659780 · cites 32.
+  [METHOD] Early real-time wearable MEMS-IMU FoG detector, >97% specificity,
+  indoor/outdoor. Foundational real-time-constraint precedent predating
+  window/RF-based deep nets; causal by design (real-time embedded operation).
+- **Al-Adhaileh et al. 2025b** — Deep learning techniques for detecting freezing of
+  gait episodes in Parkinson's disease using wearable sensors. *Frontiers in
+  Physiology.* DOI: 10.3389/fphys.2025.1581699 · cites 11.
+  [METHOD][DEPLOYMENT] CNN-BiLSTM+attention on tDCS-FOG/DeFOG/Daily-Living/Hantao
+  multimodal sets; quantized + pruned for Raspberry Pi / Coral TPU, inference
+  latency <350 ms. Direct Jetson-class edge-latency comparator for our deployment
+  numbers. Distinct paper from the WaveNet Al-Adhaileh et al. 2025 entry already
+  in references.md (different DOI/venue) — labeled "2025b" to disambiguate
+  same-author-year collision. Causal post-processing not stated in abstract —
+  flagged unconfirmed.
+
+=====================================================================
+SECTION 4 — DE-DUP SUMMARY ACROSS ALL 3 QUERIES
+=====================================================================
+- No cross-query duplicates: the 6 new entries (3 from Query 1 + 0 from Query 2 +
+  3 from Query 3) have 6 distinct DOIs, none repeated across queries.
+- 3 candidates were duplicates of pre-existing references.md entries (O'Day 2022,
+  Bikias 2021 DeepFoG, Huang 2023) — all from Query 1, not re-appended.
+- One same-author-year collision was found and disambiguated: "Al-Adhaileh et al.
+  2025" already exists in references.md (WaveNet paper, DOI 10.57197/jdr-2025-0722,
+  J Disability Research) and is a DIFFERENT paper from the new Frontiers in
+  Physiology entry (DOI 10.3389/fphys.2025.1581699). No DOI conflict (different
+  DOIs, different venues) — labeled the new entry "Al-Adhaileh et al. 2025b" per
+  citation-key convention rather than treating it as a duplicate or a conflict.
+
+=====================================================================
+SECTION 5 — STOP-AND-REPORT LOG
+=====================================================================
+1. Part B, line 19: `nrp-literature:get_paper_detail(doi_or_id)` has no obvious
+   scholar-tool counterpart. Left UNPATCHED rather than guessed. Candidate but
+   rejected: extract_granular_paper_details (requires a pre-ingested document_id,
+   not a raw DOI; purpose is granular claim/method extraction, not simple
+   metadata lookup). Human decision needed: either (a) accept a two-step
+   ingest_paper_fulltext -> extract_granular_paper_details workflow as the new
+   equivalent and update the SKILL.md prose accordingly (out of surgical
+   str_replace scope, needs explicit sign-off), or (b) drop the "get single-paper
+   detail" capability from the skill's documented tool list.
+
+2. Query 2 returned 0 qualifying papers after two search passes (10 keyword
+   variants total) across both servers. This is reported as a genuine null
+   result, not a search failure — see near-miss note on Lin & Grewal 2026 in
+   Section 3. Sampling-rate-alignment methodology specifically for FoG/wearable
+   IMU appears to be a genuine literature gap, consistent with this being framed
+   as project-original context ("this query finds how others bridge the gap
+   without retraining the model") in the task brief.
+
+3. Query 3: "Minimizing the Latency of Freezing of Gait Detection on Wearable
+   Devices" (Haddadi Esfahani et al. 2024, DOI 10.5162/iccc2024/2.2, ICCC 2024
+   Vorträge) is a near-exact title match for this query's topic, but Crossref,
+   OpenAlex, and Google Scholar all returned a null/empty abstract for it — no
+   tool call surfaced its content. Excluded from references.md per the "never
+   fabricate a citation" guardrail (cannot confirm window-size/stride/model-type
+   details from title alone). Flagging for the human: if this paper's content
+   matters, manual retrieval of the ICCC 2024 proceedings paper is recommended
+   before citing it.
+
+4. Query 3: "Fog-finder: Real-time freezing of gait detection and treatment"
+   (Koltermann, Jung, Blackwell et al., Proceedings of the 8th ACM/IEEE
+   UbiComp/ISWC-adjacent conference, 2023) surfaced via Google Scholar with an
+   on-topic snippet ("we maintain low FoG detection latency on mobile
+   hardware") and a dl.acm.org URL (https://dl.acm.org/doi/abs/10.1145/
+   3580252.3586980) from which a DOI could be inferred, but the scholar
+   literature-graph tool's own canonical search never returned this record with
+   an explicit `doi` field — three separate literature_graph queries targeting
+   it instead returned adjacent papers. Excluded rather than using a
+   URL-inferred DOI not confirmed by the tool's structured output.
+
+5. Query 1: two relevant papers (Delgado-Terán et al. 2025; Gregorčič & Georgiev
+   2025) were discovered while resolving Query 3 candidates through
+   Google-Scholar-derived canonical lookups, not through Query 1's own search
+   calls. They clearly address Query 1's topic (single-ankle competitiveness;
+   placement standardization) more than Query 3's, so they were filed under
+   Query 1 and appended there. Flagging this process deviation for transparency
+   — no query's keyword list was skipped or under-run; this was incidental
+   overlap in a federated multi-provider search.
+
+6. No filesystem, permission, or MCP-approval anomalies encountered. No writes
+   were made to data/, src/, results/RUN_*/, scripts/, edge/, _archive/,
+   PROJECT_STATUS.md, DECISIONS.md, CLAUDE.md, or EXPERIMENTS.md.
+
+--- PATCH LOG (appended 2026-07-09) ---
+File: .claude/skills/lit-review/SKILL.md
+Line patched: 19
+Before: `nrp-literature:get_paper_detail(doi_or_id)` — only when references/citations of a
+  specific paper are needed.
+After: `scholar:search_literature_graph(query="doi:<doi>")` — lightweight single-paper
+  metadata lookup (author, year, abstract, cites, venue). For deep per-paper
+  extraction (claims/methods/datasets/metrics), use the two-step path:
+  `scholar:ingest_paper_fulltext(doi_or_url)` then
+  `scholar:extract_granular_paper_details(document_id)`.
+Post-patch grep nrp-literature: 0 matches -- CLEAN
