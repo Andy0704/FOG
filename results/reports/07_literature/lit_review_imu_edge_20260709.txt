@@ -348,3 +348,25 @@ After: `scholar:search_literature_graph(query="doi:<doi>")` — lightweight sing
   `scholar:ingest_paper_fulltext(doi_or_url)` then
   `scholar:extract_granular_paper_details(document_id)`.
 Post-patch grep nrp-literature: 0 matches -- CLEAN
+
+--- WOS BATCH APPEND LOG (appended 2026-07-13) ---
+Added 8 entries under "## WOS search — FoG methods, RAS, cross-dataset"
+DOIs appended: 10.1109/TNSRE.2013.2287241, 10.1109/TNSRE.2025.3618400,
+  10.1016/j.gaitpost.2026.110171, 10.1002/mds.26718, 10.1016/j.eswa.2024.124522,
+  10.1186/s12984-024-01320-1, 10.1038/s41598-017-16232-5, 10.1136/jnnp.2006.097923
+Pre-append DOI count: 15
+Post-append DOI count: 23
+tail -5 of references.md after append:
+  "  [METHODOLOGY] Single lumbar IMU (Axivity AX3, 100 Hz), DeFoG dataset, 2 s windows;
+    AP-axis FoG-ratio peaks at FoG; AP+V RMS already elevated in pre-FoG window.
+    Supports physiological justification for our 1 s prediction horizon: pre-FoG
+    biomechanical signatures are detectable before episode onset. Sensor site differs
+    (lumbar vs. our ankle); AUC moderate (AP RMS 0.61, V RMS 0.63) vs. our DL approach."
+All 8 DOIs confirmed absent before append: YES
+
+--- EXPERIMENT LOG: PREDICTION step_size=16 (appended 2026-08-13) ---
+Run       : RUN_20260812_162956
+Condition : step_size=16 (25% overlap) vs step_size=32 (50%)
+Motivation: Hwang 2025 overlap sensitivity analysis
+Window count: 2.0x increase confirmed (smoke 2026-08-12)
+Results   : see results/reports/01_baselines/baseline_prediction_step16.txt

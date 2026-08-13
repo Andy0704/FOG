@@ -565,3 +565,97 @@ pipeline defect.
 **Speedup vs WSL/RTX4060:** ~2.2x faster forward pass than the WSL PyTorch-
 GPU baseline (1.4006 ms median, `edge_scaffold_2.txt`), and ~1.9x faster
 than the WSL CPU baseline (1.2037 ms median).
+
+---
+
+## Session Updates 2026-07-09 to 2026-08-09
+
+### Literature Review MCP Infrastructure (2026-07-09)
+- Registered two project-scoped MCP servers in .mcp.json:
+  scholar (ScholarMCP: OpenAlex + Crossref + Semantic Scholar + Google Scholar)
+  scipapers (@futurelab-studio/latest-science-mcp: arXiv + OpenAlex + EuropePMC + CORE)
+- .env.mcp.example created; .env.mcp gitignored via existing .env.* glob
+- .claude/skills/lit-review/SKILL.md re-pointed from nrp-literature to live
+  server names (0 remaining nrp-literature references)
+- Raw query report: results/reports/07_literature/lit_review_imu_edge_20260709.txt
+- 14 new references appended to docs/literature/references.md in two batches:
+  Batch 1 (MCP search): Abbasi&Rezaee2024, Delgado-Teran2025, Gregorcic2025,
+    Koltermann2024, Kita2017, Al-Adhaileh2025b
+  Batch 2 (WOS manual): Djuric-Jovicic2014, Hwang2025, Yang2024, Sigcha2024,
+    Ghai2018, Nieuwboer2007, DelDin2016, Costa2026
+- Key confirmed technical parameters (see docs/lit_reading_strategy.md):
+  Yang 2024: RF=243 samples=3.8s, non-causal, offline annotation only
+  Sigcha 2024: Daphnet AUROC 0.844 (single-dataset); cross-dataset 0.839;
+    domain shift root cause = subject heterogeneity, NOT Fs or sensor placement
+  Hwang 2025: subject-dependent 70/30 CV -- 96% sensitivity NOT comparable to LOSO
+  O'Day 2022: hardware 128Hz -> model 64Hz (FIR downsampled, confirmed)
+
+### IMU Hardware Bring-up (2026-07-13)
+- LSM6DS3 breakout board soldered and wired to Jetson I2C bus 7, addr 0x6A
+  WHO_AM_I = 0x69 (confirmed valid for this board variant)
+- Stable 104Hz acquisition via smbus2; scipy.signal.resample_poly(UP=8, DOWN=13)
+  achieves 64Hz output (achieved: 64.9-65.0Hz steady-state, within 1% tolerance)
+- imu_collector.py (Phase A): 104Hz acquisition thread + FIR resample + CSV logging
+- imu_phase_b.py (Phase B): full pipeline with TRT FP32 engine inference
+  DEPENDENCY CHAIN RESOLVED:
+    pycuda needed numpy<2 -- pinned via pip install "numpy<2" --user
+    onnxruntime 1.19.2 retained (1.23.x has ARM CPU vendor detection crash on Orin)
+    scipy upgraded to 1.15.3 (numpy 2 compatible)
+  TRT API MIGRATION: execute_async_v2 -> execute_async_v3 (TRT 10.x on JetPack 6.2)
+  Tensor binding via set_tensor_address() (v3 API pattern)
+- CURRENT BLOCKER: prob stuck at 0.573-0.578 regardless of motion
+  Root cause: IMU axis orientation mismatch vs Daphnet training distribution
+  (scaler mean/scale extracted from S02-S09 training fold and SCP'd to Jetson)
+  Fix pending: need to measure static IMU values and remap axes to match Daphnet
+
+### BLE IMU Architecture Decision (2026-08-09)
+- Hardware: Seeed XIAO nRF52840 Sense ordered (LSM6DS3TR-C onboard, 21x17.5mm)
+- Rationale: I2C jumper wire causes motion artifacts during walking tests;
+  BLE eliminates mechanical coupling between sensor and Jetson
+- nRF52840 Arduino firmware written (fog_imu_ble.ino):
+  104Hz acquisition -> batch-4 BLE Notify (26-byte packets, 0xFE sync header)
+  WHO_AM_I accepts 0x6C (TR-C variant) or 0x69 (original LSM6DS3)
+- Jetson-side bleak receiver stub ready (drop-in for smbus2 acquisition thread)
+- Handoff: PhD student (lab senior) handling BLE firmware on nRF-based board;
+  will adapt to XIAO nRF52840 Sense. Interim: continue with I2C wired setup.
+
+### CII Window Exclusion Analysis (2026-08-09)
+ADR FINDING (no code change needed):
+- Proposed CII-style window exclusion (Hwang 2025) is ALREADY implemented in
+  the current PREDICTION pipeline via exclude_mask = (y == 1) in
+  make_prediction_labels(), applied unconditionally in create_windows().
+- All windows whose input frames contain active FoG are already excluded from
+  both training and validation. The PREDICTION baseline (RUN_20260703_173337)
+  is mathematically equivalent to Hwang's CII framing.
+- Write-up framing: cite Hwang 2025 CII and note our exclude_mask implements
+  the same principle. No new experiment required.
+- True Hwang-inspired experiment NOT yet run: step_size=16 (25% overlap, vs
+  current step_size=32 = 50%) -- deferred to Future Work per scope freeze.
+
+### Scope Freeze (2026-08-15)
+[SCOPE FROZEN 2026-08-15]
+Hard deadline: 2026-09-07 (showcase demo)
+From 2026-08-15: no new models, no new ADRs, no new features.
+All future ideas -> future_work.md only.
+Only allowed: fix IMU axis alignment bug (current demo blocker).
+Demo target: causal TCN + single-ankle IMU + Jetson TRT + RAS metronome cue.
+RAS target level: bonus tier (pygame 2Hz metronome, 5s duration).
+
+### step_size=16 PREDICTION Baseline (2026-08-13) — NEW OFFICIAL
+Run: RUN_20260812_162956
+Replaces: RUN_20260703_173337 (step=32) as official PREDICTION reference.
+Both runs retained on disk for comparison.
+
+Results (8-fold nested LOSO, step=16, Trial-26 hyperparameters):
+  Episode_Recall         : 0.7834 +/- 0.1069  (+0.085 vs step=32)
+  Episode_MeanLeadTime_s : 0.8272 +/- 0.0604  (+0.112 vs step=32)
+  Test_ROC_AUC           : 0.8126 +/- 0.0490  (+0.072 vs step=32)
+  Note: all 8/8 folds contributed a valid Test_ROC_AUC (no NaN/excluded
+  folds); per-fold positive window counts (Episode_N) range 10-65 -- see
+  baseline_prediction_step16.txt for the full per-subject table.
+
+Scientific rationale: step=16 aligns training stride with infer_step=16
+(ADR-017). Consistent with Hwang 2025 overlap sensitivity analysis.
+Improvement is structural (train-deploy alignment), not just data quantity.
+
+Showcase primary numbers updated — see results/reports/01_baselines/showcase_data.md
