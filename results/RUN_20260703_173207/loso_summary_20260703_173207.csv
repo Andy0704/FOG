@@ -1,0 +1,2 @@
+Subject,Val_Subject_selected,Best_Threshold,Test_F1,Test_PR_AUC,Test_ROC_AUC,inner_scores_json,Episode_N,Episode_Recall,Episode_MeanLeadTime_s
+S01,S08,0.28405430912971497,0.031904287138584245,0.04591993514328742,0.6343342895818587,"{""S02"": 0.6813, ""S03"": 0.5516, ""S05"": 0.6988, ""S06"": 0.5065, ""S07"": 0.6067, ""S08"": 0.6492, ""S09"": 0.7032}",23,0.391304347826087,0.6822916666666666

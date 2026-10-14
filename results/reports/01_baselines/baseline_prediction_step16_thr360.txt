@@ -1,0 +1,30 @@
+========================================================================
+PREDICTION BASELINE -- step_size=16, NEW THRESHOLD=0.36
+Re-evaluation of RUN_20260812_162956 predictions at deployment threshold
+Original LOSO threshold: 0.176353 (val-selected, Youden J)
+New threshold: 0.36 (calibrated on real-body deployment)
+========================================================================
+
+Post-processing: causal_median(k=3) + majority_vote(w=4) + refractory(2.0s)
+
+Aggregate Episode Recall : 0.0286 +/- 0.1671
+Aggregate Mean Lead Time : 0.7531  +/- 0.4203 s
+
+Per-subject breakdown:
+  Subject  Recall   Lead(s)    Episodes   Triggers  
+  S01      0.111    0.500      23         157       
+  S02      0.000    N/A        24         0         
+  S03      0.047    0.883      49         112       
+  S05      0.000    N/A        66         0         
+  S06      0.000    N/A        10         17        
+  S07      0.062    1.000      24         133       
+  S08      0.000    N/A        14         0         
+  S09      0.000    N/A        27         55        
+
+NOTE: triggers >> episodes at thr=0.176 (LOSO) is expected —
+  that threshold maximizes recall, not FAR. At thr=0.360 (deployment),
+  trigger rate should be substantially lower.
+
+Comparison:
+  thr=0.176 (LOSO val): recall=0.7834 +/- 0.1069, lead=0.8272 +/- 0.0604s
+  thr=0.36 (deployment): recall=0.0286 +/- 0.1671, lead=0.7531 +/- 0.4203s

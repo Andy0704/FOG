@@ -370,3 +370,9 @@ Condition : step_size=16 (25% overlap) vs step_size=32 (50%)
 Motivation: Hwang 2025 overlap sensitivity analysis
 Window count: 2.0x increase confirmed (smoke 2026-08-12)
 Results   : see results/reports/01_baselines/baseline_prediction_step16.txt
+
+--- MANUAL ADD (2026-09-12): Borzì et al. 2025 (Comput Electr Eng)
+DOI: 10.1016/j.compeleceng.2025.110530
+Source: full PDF reviewed directly (not MCP search)
+Key finding: MCU-class edge deployment, subject-split validation, detection
+only. Added as direct comparator — brief positioning updated accordingly.
